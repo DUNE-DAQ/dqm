@@ -22,6 +22,8 @@
 
 #include "dataformats/TriggerRecord.hpp"
 
+#include "Exporter.hpp"
+#include "PdspChannelMapService.cpp"
 
 namespace dunedaq::dqm{
  
@@ -33,7 +35,8 @@ class Fourier {
   double find_value(uint64_t time);
   CArray fourier_prep(const std::vector<double> &input) const;
   CArray fourier_rebin(CArray input, double factor);
-  void fast_fourier_transform(CArray &x);
+  void fast_fourier_transform_1(CArray &x);
+  void fast_fourier_transform_2(CArray &x);
 
 public:
   uint64_t m_start, m_end, m_inc_size;
@@ -72,9 +75,19 @@ CArray Fourier::fourier_prep(const std::vector<double> &input) const
 {
   std::valarray<Complex> output (input.size());
   Complex val;
+ 
+  //Compute mean in order to centre time series around 0 in y 
+  double mean = 0;
   for (size_t i = 0; i < input.size(); i++)
   {
-    val = input[i];
+    mean += input[i];
+  }
+  mean = (double) mean/(input.size());
+
+  //Return shifted time series
+  for (size_t i = 0; i < input.size(); i++)
+  {
+    val = input[i] - mean;
     output[i] = val;
   }
   return output;
@@ -93,15 +106,42 @@ CArray Fourier::fourier_rebin(CArray input, double factor)
   return output;
 }
 
+//Cooley–Tukey FFT (in-place, divide-and-conquer)
+// Higher memory requirements and redundancy although more intuitive
+void Fourier::fast_fourier_transform_1(CArray& x)
+{ 
+  const size_t N = x.size();
+  if (N <= 1) return;
+           
+  // divide
+  CArray even = x[std::slice(0, N/2, 2)];
+  CArray  odd = x[std::slice(1, N/2, 2)];
+  
+  // conquer
+  fast_fourier_transform_1(even);
+  fast_fourier_transform_1(odd);
+  
+  // combine
+  for (size_t k = 0; k < N/2; ++k)
+  { 
+    Complex t = std::polar(1.0, -2 * 3.14159265358979323846264338328 * k / N) * odd[k];
+    x[k    ] = even[k] + t;
+    x[k+N/2] = even[k] - t;
+  }
+}
+
+
 // Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
-void Fourier::fast_fourier_transform(CArray &x)
+void Fourier::fast_fourier_transform_2(CArray &x)
 {
   // DFT
   unsigned int N = x.size(), k = N, n;
   double thetaT = 3.14159265358979323846264338328L / N;
   Complex phiT = Complex(cos(thetaT), -sin(thetaT)), T;
+  TLOG() << "WHILE LOOP BEGINS" << std::endl;
   while (k > 1)
   {
+    TLOG() << "k = " << k << std::endl;
     n = k;
     k >>= 1;
     phiT = phiT * phiT;
@@ -118,10 +158,12 @@ void Fourier::fast_fourier_transform(CArray &x)
       T *= phiT;
     }
   }
+  TLOG() << "WHILE LOOP ENDS, FOR LOOP BEGINS" << std::endl;
   // Decimate
   unsigned int m = (unsigned int)log2(N);
   for (unsigned int a = 0; a < N; a++)
   {
+    TLOG() << "a = " << a << std::endl;
     unsigned int b = a;
     // Reverse bits
     b = (((b & 0xaaaaaaaa) >> 1) | ((b & 0x55555555) << 1));
@@ -136,35 +178,24 @@ void Fourier::fast_fourier_transform(CArray &x)
       x[b] = t;
     }
   }
+  TLOG() << "FOR LOOP ENDS" << std::endl;
 }
 
 void Fourier::compute_fourier(double rebin_factor)
 {
-  //std::cout << "Computing FT" << std::endl;
   CArray input = fourier_prep(m_data);
-  //std::cout << "Input prepared" << std::endl;
-  fast_fourier_transform(input);
-  //m_data.clear();
-  //std::cout << "Transform performed" << std::endl;
+  fast_fourier_transform_1(input);
+  //fast_fourier_transform_2(input);
   int newsize = (int) input.size()/rebin_factor;
-  //std::cout << "Size of array after rebinning = " << newsize << std::endl;
-  CArray out_array (input);
-  //std::cout << "CArray set up" << std::endl;
-  // out_array = fourier_rebin(input, rebin_factor);
-  //std::cout << "Rebinning complete" << std::endl;
+  CArray out_array (newsize);
+  out_array = fourier_rebin(input, rebin_factor);
   m_rebin_factor = rebin_factor;
-  //std::cout << "Rebin factor saved" << std::endl;
-  m_fourier_transform.resize(input.size());
-  //std::cout << "Beginning loop" << std::endl;
+  m_fourier_transform.resize(newsize);
   for (size_t i = 0; i < out_array.size(); i++)
   {
-    //std::cout << "i = " << i << std::endl;
-    double val = (double) out_array[i].real();
-    //std::cout << "val = " << val << std::endl;
+    double val = (double) std::abs(out_array[i]);
     m_fourier_transform[i] = val;
-    //std::cout << "Pushed back" << std::endl;
   }
-  //std::cout << "Completing" << std::endl;
 }
  
 int Fourier::enter(double value, uint64_t time)
@@ -235,10 +266,12 @@ void Fourier::save_fourier(std::ofstream &filehandle) const
   filehandle << std::endl;
 }
 
+//===================================================
 
 class FourierLink : public AnalysisModule{
   std::string m_name;
   std::vector<Fourier> fouriervec;
+  std::vector<std::string> chanvec;
   bool m_run_mark;
 
 public:
@@ -246,6 +279,7 @@ public:
   FourierLink(std::string name, int start, int end, int npoints);
 
   void run(dunedaq::dataformats::TriggerRecord &tr, std::string mode);
+  void transmit(const std::string &topicname, int run_num, time_t timestamp, std::string chaninf) const;
   bool is_running();
 };
 
@@ -253,20 +287,91 @@ FourierLink::FourierLink(std::string name, int start, int end, int npoints)
   : m_name(name), m_run_mark(false)
 {
   for(int i=0; i<256; ++i){
+    std::string chaninf = "NULL NULL NULL";
     Fourier fourier(start, end, npoints);
     fouriervec.push_back(fourier);
+    chanvec.push_back(chaninf);
   }
 }
 
+void FourierLink::transmit(const std::string &topicname, int run_num, time_t timestamp, std::string chaninf) const
+{
+  //TLOG() << "Beginning FFT transmission" << std::endl;
+  std::stringstream csv_output;
+  std::string datasource = "TESTSOURCE";
+  std::string dataname   = this->m_name;
+  std::string axislabel = "TESTLABEL";
+  std::stringstream metadata;
+  metadata << chaninf << " " << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end;
+
+  //TLOG() << "Got strings" << std::endl; 
+
+  int subrun = 0;
+  int event = 0;
+  
+  //Construct CSV output
+  csv_output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp << ";" << metadata.str() << ";";
+  csv_output << axislabel << "\n";
+  for (int ich = 0; ich < 256; ++ich)
+  {
+    csv_output << chaninf << "\n";
+    for (auto x: fouriervec[ich].m_data) csv_output << x << " ";
+    csv_output << "\n";
+  }
+  //csv_output << "\n"; 
+  
+  //TLOG() << "Constructed output" << std::endl;
+  
+  //Transmit
+  KafkaExport(csv_output.str(), topicname);
+
+  //TLOG() << "Export complete" << std::endl;
+}
+
 void FourierLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode){
+
+  PdspChannelMapService channelMap("protoDUNETPCChannelMap_RCE_v4.txt", "protoDUNETPCChannelMap_FELIX_v4.txt");
+
   m_run_mark = true;
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
 
   for(auto &fr:wibframes){
     for(int ich=0; ich<256; ++ich)
+    {
+      //Get channel info
+      int crate = fr.get_wib_header()->crate_no;
+      int slot = fr.get_wib_header()->slot_no;
+      int fiber = fr.get_wib_header()->fiber_no;
+      unsigned int fiberloc = FiberLoc(fiber);
+      unsigned int crateloc = crate;
+      unsigned int chloc = ich;
+      if (chloc > 127)
+      {
+        chloc -= 128;
+        fiberloc++;
+      }
+      unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
+      //unsigned int offline = ich;
+      unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
+      unsigned int apa = channelMap.APAFromOfflineChannel(offline);
+      std::stringstream chan_info;
+      //chan_info << apa << " " << plane << " " << offline;
+      chan_info << offline;
+
       fouriervec[ich].enter(fr.get_channel(ich), 0);
+      chanvec[ich] = chan_info.str();
+    }
+    //TLOG() << "COMPUTING" << std::endl;
+    for (int ich=0; ich<256; ++ich)
+    {
+      //TLOG() << "Channel " << ich << std::endl;
+      fouriervec[ich].compute_fourier(1);
+    }
+    //TLOG() << "COMPUTED" << std::endl;
   }
+
+  this->transmit("testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp(), chanvec[0]);
 
   for(int ich=0; ich<256; ++ich)
     fouriervec[ich].save("Fourier/" + m_name + "-" + std::to_string(ich) + ".txt");

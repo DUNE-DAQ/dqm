@@ -25,4 +25,3 @@ daq_add_library()
 daq_add_plugin(DataReceiver duneDAQModule LINK_LIBRARIES appfwk::appfwk dataformats::dataformats dqm readout RdKafka::rdkafka RdKafka::rdkafka++)
 
 daq_install()
-

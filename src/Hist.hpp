@@ -30,6 +30,8 @@
 
 #include "dataformats/TriggerRecord.hpp"
 
+#include "PdspChannelMapService.cpp"
+
 /**
  * Basic 1D histogram that counts entries
  * It only supports uniform binning
@@ -147,6 +149,7 @@ Hist::run(dunedaq::dataformats::TriggerRecord &tr)
 class HistLink : public AnalysisModule{
   std::string m_name;
   std::vector<Hist> histvec;
+  std::vector<std::string> chanvec;
   bool m_run_mark;
 
 public:
@@ -154,7 +157,7 @@ public:
   HistLink(std::string name, int steps, double low, double high);
 
   void run(dunedaq::dataformats::TriggerRecord &tr, std::string mode);
-  void transmit(const std::string &topicname, int run_num, time_t timestamp) const;
+  void transmit(const std::string &topicname, int run_num, time_t timestamp, std::string chaninf) const;
 
   bool is_running();
 };
@@ -163,19 +166,21 @@ HistLink::HistLink(std::string name, int steps, double low, double high)
   : m_name(name), m_run_mark(false)
 {
   for(int i=0; i<256; ++i){
+    std::string chaninf = "NULL NULL NULL";
     Hist hist(steps, low, high);
     histvec.push_back(hist);
+    chanvec.push_back(chaninf);
   }
 }
 
-void HistLink::transmit(const std::string &topicname, int run_num, time_t timestamp) const
+void HistLink::transmit(const std::string &topicname, int run_num, time_t timestamp, std::string chaninf) const
 {
   std::stringstream csv_output;
   std::string datasource = "TESTSOURCE";
   std::string dataname   = this->m_name;
   std::string axislabel = "TESTLABEL";
   std::stringstream metadata;
-  metadata << histvec[0].m_steps << " " << histvec[0].m_low << " " << histvec[0].m_high;
+  metadata << chaninf << " " << histvec[0].m_steps << " " << histvec[0].m_low << " " << histvec[0].m_high;
 
   int subrun = 0;
   int event = 0;
@@ -185,7 +190,7 @@ void HistLink::transmit(const std::string &topicname, int run_num, time_t timest
   csv_output << axislabel << "\n";
   for (int ich = 0; ich < 256; ++ich)
   {
-    csv_output << "Histogram_" << ich+1 << "\n";
+    csv_output << chaninf << "\n";
     for (auto x: histvec[ich].m_entries) csv_output << x << " ";
     csv_output << "\n";
   }
@@ -197,18 +202,39 @@ void HistLink::transmit(const std::string &topicname, int run_num, time_t timest
 
   void HistLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode){
 
+  PdspChannelMapService channelMap("protoDUNETPCChannelMap_RCE_v4.txt", "protoDUNETPCChannelMap_FELIX_v4.txt");
   std::srand((unsigned) time(NULL));
 
   m_run_mark = true;
   dunedaq::dqm::Decoder dec;
-  TLOG() << "Decoding" << std::endl;
   auto wibframes = dec.decode(tr);
-  TLOG() << "WIB frames decoded" << std::endl;
 
   for(auto &fr:wibframes){
+
     for(int ich=0; ich<256; ++ich)
     {
+      //Get channel info
+      int crate = fr.get_wib_header()->crate_no;
+      int slot = fr.get_wib_header()->slot_no;
+      int fiber = fr.get_wib_header()->fiber_no;
+      unsigned int fiberloc = FiberLoc(fiber);
+      unsigned int crateloc = crate;
+      unsigned int chloc = ich;
+      if (chloc > 127)
+      {
+        chloc -= 128;
+        fiberloc++;
+      }
+      unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
+      //unsigned int offline = ich;
+      unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
+      unsigned int apa = channelMap.APAFromOfflineChannel(offline);
+      std::stringstream chan_info;
+      //chan_info << apa << " " << plane << " " << offline;
+      chan_info << offline;
+      
       histvec[ich].fill(fr.get_channel(ich));
+      chanvec[ich] = chan_info.str();
     }
   }
 
@@ -219,7 +245,7 @@ void HistLink::transmit(const std::string &topicname, int run_num, time_t timest
   }
 
   //Transmit via kafka
-  this->transmit("testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
+  this->transmit("testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp(), chanvec[0]);
 
   for(int ich=0; ich<256; ++ich)
   {

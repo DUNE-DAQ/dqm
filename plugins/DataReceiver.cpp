@@ -84,7 +84,7 @@ void decode(dataformats::TriggerRecord &record){
   rolling_index++;
   if(rolling_index >= 20)
     rolling_index -= 10;
-  TLOG() << "rolling_indx" << rolling_index;
+  //TLOG() << "rolling_indx" << rolling_index;
 
 
   std::vector<Hist> v;
@@ -153,14 +153,14 @@ void DataReceiver::RequestMaker(){
 
   // Instances of analysis modules
   HistLink hist1s("hist1s", 100, 0, 5000);
-  HistLink hist5s("hist5s", 50, 0, 5000);
-  HistLink hist10s("hist10s", 10, 0, 5000);
+  //HistLink hist5s("hist5s", 50, 0, 5000);
+  //HistLink hist10s("hist10s", 10, 0, 5000);
   FourierLink fourier10s("fourier10s", 0, 10, 100);
 
   // Initial tasks
   map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
-  map[std::chrono::system_clock::now()] = {&hist5s, 5, 1};
-  map[std::chrono::system_clock::now()] = {&hist10s, 10, 1};
+  //map[std::chrono::system_clock::now()] = {&hist5s, 5, 1};
+  //map[std::chrono::system_clock::now()] = {&hist10s, 10, 1};
   map[std::chrono::system_clock::now()] = {&fourier10s, 10, 2};
 
   std::vector<std::thread> threads;
@@ -168,7 +168,6 @@ void DataReceiver::RequestMaker(){
 
   // Main loop, running forever
   while(m_run_marker){
-
     auto fr = map.begin();
     if (fr == map.end()){
       TLOG() << "Empty map! This should never happen!";
@@ -212,7 +211,6 @@ void DataReceiver::RequestMaker(){
 
     // Delete the entry we just used and find the next one
     map.erase(fr);
-
   }
 
 }
