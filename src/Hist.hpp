@@ -206,17 +206,37 @@ void HistLink::transmit(const std::string &topicname, int run_num, time_t timest
   std::srand((unsigned) time(NULL));
 
   m_run_mark = true;
+
+  //------------------------------------
+  //MUCKING ABOUT
+  
+  std::vector<dataformats::WIBFrame*> wib_frames;
+  std::vector<std::unique_ptr<dataformats::Fragment>>& fragments = tr.get_fragments_ref();
+  for (auto &fragment:fragments)
+  {
+    int num_chunks = (fragment->get_size() - sizeof(dataformats::FragmentHeader)) / 464;
+
+    for (int i = 0; i < num_chunks; i++)
+    {
+      dataformats::WIBFrame* frame = reinterpret_cast<dataformats::WIBFrame*> (static_cast<char*>(fragment->get_data()) + (i * 464));
+      //TLOG() << "TIME FROM ALTERNATIVE: " << frame->get_wib_header()->get_timestamp() << std::endl;
+      wib_frames.push_back(frame);
+    } 
+  }
+  //------------------------------------
+
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
 
-  for(auto &fr:wibframes){
+  //for(auto &fr:wibframes){
+  for (auto &fr:wib_frames){
 
     for(int ich=0; ich<256; ++ich)
     {
       //Get channel info
-      int crate = fr.get_wib_header()->crate_no;
-      int slot = fr.get_wib_header()->slot_no;
-      int fiber = fr.get_wib_header()->fiber_no;
+      int crate = fr->get_wib_header()->crate_no;
+      int slot = fr->get_wib_header()->slot_no;
+      int fiber = fr->get_wib_header()->fiber_no;
       unsigned int fiberloc = FiberLoc(fiber);
       unsigned int crateloc = crate;
       unsigned int chloc = ich;
@@ -225,15 +245,15 @@ void HistLink::transmit(const std::string &topicname, int run_num, time_t timest
         chloc -= 128;
         fiberloc++;
       }
-      unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
-      //unsigned int offline = ich;
-      unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
-      unsigned int apa = channelMap.APAFromOfflineChannel(offline);
+      //unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
+      unsigned int offline = ich;
+      //unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
+      //unsigned int apa = channelMap.APAFromOfflineChannel(offline);
       std::stringstream chan_info;
       //chan_info << apa << " " << plane << " " << offline;
       chan_info << offline;
       
-      histvec[ich].fill(fr.get_channel(ich));
+      histvec[ich].fill(fr->get_channel(ich));
       chanvec[ich] = chan_info.str();
     }
   }

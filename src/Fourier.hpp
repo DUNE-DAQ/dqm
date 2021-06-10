@@ -42,11 +42,12 @@ public:
   uint64_t m_start, m_end, m_inc_size;
   int m_npoints;
   std::vector<double> m_data;
-  double m_rebin_factor;
+  double m_rebin_factor, m_duration;
   //CArray m_fourier_transform (10000);
   std::vector<double> m_fourier_transform;
 
-  Fourier(uint64_t start, uint64_t end, int npoints);
+  //Fourier(uint64_t start, uint64_t end, int npoints);
+  Fourier(double duration, int npoints);
   int enter(double value, uint64_t time);
   void compute_fourier(double rebin_factor);
 
@@ -58,14 +59,19 @@ public:
 };
 
 
-Fourier::Fourier(uint64_t start, uint64_t end, int npoints) 
+//Fourier::Fourier(uint64_t start, uint64_t end, int npoints) 
 //  : m_start(start), m_end(end), m_npoints(npoints)
+Fourier::Fourier(double duration, int npoints)
 {
-  m_start = start;
-  m_end = end;
+  //m_start = start;
+  //m_end = end;
+  //m_npoints = npoints;
+  m_duration = duration;
   m_npoints = npoints;
+  m_start = -1;
+  m_end = -1;
 
-  uint64_t npoints64 = (uint64_t) npoints;
+  //uint64_t npoints64 = (uint64_t) npoints;
   //m_inc_size = (end - start)/npoints64;
   m_inc_size = 25;
   m_data = std::vector<double> (npoints, 0);
@@ -200,6 +206,14 @@ void Fourier::compute_fourier(double rebin_factor)
  
 int Fourier::enter(double value, uint64_t time)
 {
+  if (m_start == -1) m_start = time;
+  if ((m_end == -1) && (time - m_start >= m_duration)) 
+  {
+    m_end = time;
+    return 1;
+  }
+  if (m_end != -1) return 1;
+
   uint64_t index64 = (time - m_start)/m_inc_size;
   if (index64 > m_npoints) 
   {
@@ -288,7 +302,8 @@ FourierLink::FourierLink(std::string name, int start, int end, int npoints)
 {
   for(int i=0; i<256; ++i){
     std::string chaninf = "NULL NULL NULL";
-    Fourier fourier(start, end, npoints);
+    //Fourier fourier(start, end, npoints);
+    Fourier fourier(end - start, npoints);
     fouriervec.push_back(fourier);
     chanvec.push_back(chaninf);
   }
@@ -333,16 +348,42 @@ void FourierLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode)
   PdspChannelMapService channelMap("protoDUNETPCChannelMap_RCE_v4.txt", "protoDUNETPCChannelMap_FELIX_v4.txt");
 
   m_run_mark = true;
+
+  //------------------------------------
+  //MUCKING ABOUT
+  
+  std::vector<dataformats::WIBFrame*> wib_frames;
+  std::vector<std::unique_ptr<dataformats::Fragment>>& fragments = tr.get_fragments_ref();
+  for (auto &fragment:fragments)
+  {
+    int num_chunks = (fragment->get_size() - sizeof(dataformats::FragmentHeader)) / 464;
+
+    for (int i = 0; i < num_chunks; i++)
+    {
+      dataformats::WIBFrame* frame = reinterpret_cast<dataformats::WIBFrame*> (static_cast<char*>(fragment->get_data()) + (i * 464));
+      //TLOG() << "TIME FROM ALTERNATIVE: " << frame->get_wib_header()->get_timestamp() << std::endl;
+      wib_frames.push_back(frame);
+    } 
+  }
+
+  //------------------------------------
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
 
-  for(auto &fr:wibframes){
+  //int counter = 0;
+  //uint64_t timeywimey = 0;
+  //for(auto &fr:wibframes){
+  for (auto &fr:wib_frames){
+    //timeywimey = fr->get_wib_header()->get_timestamp();
+    //if (counter == 0) TLOG() << "FIRST TIME = " << timeywimey << std::endl;
+    //else TLOG() << "TIME = " << timeywimey << std::endl;
+    //counter ++;
     for(int ich=0; ich<256; ++ich)
     {
       //Get channel info
-      int crate = fr.get_wib_header()->crate_no;
-      int slot = fr.get_wib_header()->slot_no;
-      int fiber = fr.get_wib_header()->fiber_no;
+      int crate = fr->get_wib_header()->crate_no;
+      int slot = fr->get_wib_header()->slot_no;
+      int fiber = fr->get_wib_header()->fiber_no;
       unsigned int fiberloc = FiberLoc(fiber);
       unsigned int crateloc = crate;
       unsigned int chloc = ich;
@@ -351,24 +392,25 @@ void FourierLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode)
         chloc -= 128;
         fiberloc++;
       }
-      unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
-      //unsigned int offline = ich;
-      unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
-      unsigned int apa = channelMap.APAFromOfflineChannel(offline);
+      //unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
+      unsigned int offline = ich;
+      //unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
+      //unsigned int apa = channelMap.APAFromOfflineChannel(offline);
       std::stringstream chan_info;
       //chan_info << apa << " " << plane << " " << offline;
       chan_info << offline;
 
-      fouriervec[ich].enter(fr.get_channel(ich), 0);
+      uint64_t timestamp = fr->get_wib_header()->get_timestamp();
+      fouriervec[ich].enter(fr->get_channel(ich), timestamp);
+      //fouriervec[ich].enter(fr.get_channel(ich), 0);
       chanvec[ich] = chan_info.str();
     }
-    //TLOG() << "COMPUTING" << std::endl;
-    for (int ich=0; ich<256; ++ich)
-    {
-      //TLOG() << "Channel " << ich << std::endl;
-      fouriervec[ich].compute_fourier(1);
-    }
-    //TLOG() << "COMPUTED" << std::endl;
+  }
+  //TLOG() << "Went through " << counter << "frames and last time was = " << timeywimey << std::endl;
+
+  for (int ich=0; ich<256; ++ich)
+  {
+    fouriervec[ich].compute_fourier(1);
   }
 
   this->transmit("testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp(), chanvec[0]);

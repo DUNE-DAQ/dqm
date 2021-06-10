@@ -155,7 +155,7 @@ void DataReceiver::RequestMaker(){
   HistLink hist1s("hist1s", 100, 0, 5000);
   //HistLink hist5s("hist5s", 50, 0, 5000);
   //HistLink hist10s("hist10s", 10, 0, 5000);
-  FourierLink fourier10s("fourier10s", 0, 10, 100);
+  FourierLink fourier10s("fourier10s", 0, 500, 20);
 
   // Initial tasks
   map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
