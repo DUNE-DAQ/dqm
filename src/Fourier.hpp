@@ -209,10 +209,16 @@ int Fourier::enter(double value, uint64_t time)
   if (m_start == -1) m_start = time;
   if ((m_end == -1) && (time - m_start >= m_duration)) 
   {
+    uint64_t test_index64 = (time - m_start)/m_inc_size;
+    if (test_index64 < m_npoints)
+    {
+      TLOG() << "Reached end of time period without reaching final index" << std::endl;
+      TLOG() << "m_start = " << m_start << ", m_end = " << time << ", last index = " << test_index64 << " out of " << m_npoints << std::endl;
+    }
     m_end = time;
     return 1;
   }
-  if (m_end != -1) return 1;
+  if ((m_end != -1) && (time - m_start >= m_duration)) return 1;
 
   uint64_t index64 = (time - m_start)/m_inc_size;
   if (index64 > m_npoints) 

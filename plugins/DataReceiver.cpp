@@ -155,16 +155,16 @@ void DataReceiver::RequestMaker(){
   HistLink hist1s("hist1s", 100, 0, 5000);
   //HistLink hist5s("hist5s", 50, 0, 5000);
   //HistLink hist10s("hist10s", 10, 0, 5000);
-  FourierLink fourier10s("fourier10s", 0, 500, 20);
+  FourierLink fourier10s("fourier10s", 0, 2500, 100);
 
   // Initial tasks
-  map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
+  //map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
   //map[std::chrono::system_clock::now()] = {&hist5s, 5, 1};
   //map[std::chrono::system_clock::now()] = {&hist10s, 10, 1};
   map[std::chrono::system_clock::now()] = {&fourier10s, 10, 2};
 
-  std::vector<std::thread> threads;
-  threads.reserve(4);
+  std::vector<std::thread> threadvec;
+  threadvec.reserve(4);
 
   // Main loop, running forever
   while(m_run_marker){
@@ -202,8 +202,8 @@ void DataReceiver::RequestMaker(){
     m_source->pop(element, m_source_timeout);
     //TLOG() << "Element popped";
     //std::thread *t = new std::thread(&AnalysisModule::run, std::ref(*algo), std::ref(*element));
-    threads.emplace_back(std::thread(&AnalysisModule::run, std::ref(*algo), std::ref(*element), m_running_mode));
-    //for (auto t: threads) t.join;
+    threadvec.emplace_back(std::thread(&AnalysisModule::run, std::ref(*algo), std::ref(*element), m_running_mode));
+    for (auto &t: threadvec) t.join();
     
 
     //Add a new entry for the current instance
