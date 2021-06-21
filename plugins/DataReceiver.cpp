@@ -158,7 +158,7 @@ void DataReceiver::RequestMaker(){
   FourierLink fourier10s("fourier10s", 0, 2500, 100);
 
   // Initial tasks
-  //map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
+  map[std::chrono::system_clock::now()] = {&hist1s, 1, 1};
   //map[std::chrono::system_clock::now()] = {&hist5s, 5, 1};
   //map[std::chrono::system_clock::now()] = {&hist10s, 10, 1};
   map[std::chrono::system_clock::now()] = {&fourier10s, 10, 2};
@@ -203,7 +203,7 @@ void DataReceiver::RequestMaker(){
     //TLOG() << "Element popped";
     //std::thread *t = new std::thread(&AnalysisModule::run, std::ref(*algo), std::ref(*element));
     threadvec.emplace_back(std::thread(&AnalysisModule::run, std::ref(*algo), std::ref(*element), m_running_mode));
-    for (auto &t: threadvec) t.join();
+    //for (auto &t: threadvec) t.join();
     
 
     //Add a new entry for the current instance

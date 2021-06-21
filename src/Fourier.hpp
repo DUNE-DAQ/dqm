@@ -37,9 +37,11 @@ class Fourier {
   CArray fourier_rebin(CArray input, double factor);
   void fast_fourier_transform_1(CArray &x);
   void fast_fourier_transform_2(CArray &x);
+  void fast_fourier_transform_3(CArray &x);
 
 public:
   uint64_t m_start, m_end, m_inc_size;
+  double m_freq_max;
   int m_npoints;
   std::vector<double> m_data;
   double m_rebin_factor, m_duration;
@@ -144,7 +146,6 @@ void Fourier::fast_fourier_transform_2(CArray &x)
   unsigned int N = x.size(), k = N, n;
   double thetaT = 3.14159265358979323846264338328L / N;
   Complex phiT = Complex(cos(thetaT), -sin(thetaT)), T;
-  TLOG() << "WHILE LOOP BEGINS" << std::endl;
   while (k > 1)
   {
     TLOG() << "k = " << k << std::endl;
@@ -164,7 +165,6 @@ void Fourier::fast_fourier_transform_2(CArray &x)
       T *= phiT;
     }
   }
-  TLOG() << "WHILE LOOP ENDS, FOR LOOP BEGINS" << std::endl;
   // Decimate
   unsigned int m = (unsigned int)log2(N);
   for (unsigned int a = 0; a < N; a++)
@@ -184,7 +184,15 @@ void Fourier::fast_fourier_transform_2(CArray &x)
       x[b] = t;
     }
   }
-  TLOG() << "FOR LOOP ENDS" << std::endl;
+}
+
+void Fourier::fast_fourier_transform_3(CArray &x)
+{
+  size_t arraysize = x.size();
+  for (size_t i = 0; i < arraysize; i++)
+  {
+    x[i] = 0;
+  }
 }
 
 void Fourier::compute_fourier(double rebin_factor)
@@ -192,6 +200,7 @@ void Fourier::compute_fourier(double rebin_factor)
   CArray input = fourier_prep(m_data);
   fast_fourier_transform_1(input);
   //fast_fourier_transform_2(input);
+  //fast_fourier_transform_3(input);
   int newsize = (int) input.size()/rebin_factor;
   CArray out_array (newsize);
   out_array = fourier_rebin(input, rebin_factor);
@@ -202,6 +211,10 @@ void Fourier::compute_fourier(double rebin_factor)
     double val = (double) std::abs(out_array[i]);
     m_fourier_transform[i] = val;
   }
+
+  double f_clock = 50E6;
+  double f_sampling = f_clock/(int)m_inc_size;
+  m_freq_max = f_sampling/2.0;
 }
  
 int Fourier::enter(double value, uint64_t time)
@@ -291,6 +304,7 @@ void Fourier::save_fourier(std::ofstream &filehandle) const
 class FourierLink : public AnalysisModule{
   std::string m_name;
   std::vector<Fourier> fouriervec;
+  std::vector<Fourier> timeseriesvec;
   std::vector<std::string> chanvec;
   bool m_run_mark;
 
@@ -310,7 +324,9 @@ FourierLink::FourierLink(std::string name, int start, int end, int npoints)
     std::string chaninf = "NULL NULL NULL";
     //Fourier fourier(start, end, npoints);
     Fourier fourier(end - start, npoints);
+    Fourier timeseries(end - start, npoints);
     fouriervec.push_back(fourier);
+    timeseriesvec.push_back(timeseries);
     chanvec.push_back(chaninf);
   }
 }
@@ -323,12 +339,14 @@ void FourierLink::transmit(const std::string &topicname, int run_num, time_t tim
   std::string dataname   = this->m_name;
   std::string axislabel = "TESTLABEL";
   std::stringstream metadata;
-  metadata << chaninf << " " << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end;
+  metadata << chaninf << " " << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end << " " << fouriervec[0].m_freq_max;
 
   //TLOG() << "Got strings" << std::endl; 
 
   int subrun = 0;
   int event = 0;
+
+  int fft_size = fouriervec[0].m_fourier_transform.size();
   
   //Construct CSV output
   csv_output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp << ";" << metadata.str() << ";";
@@ -336,7 +354,8 @@ void FourierLink::transmit(const std::string &topicname, int run_num, time_t tim
   for (int ich = 0; ich < 256; ++ich)
   {
     csv_output << chaninf << "\n";
-    for (auto x: fouriervec[ich].m_data) csv_output << x << " ";
+    //for (auto x: fouriervec[ich].m_fourier_transform) csv_output << x << " ";
+    for (int i = 0; i < fft_size/2; i++) csv_output << fouriervec[ich].m_fourier_transform[i] << " ";
     csv_output << "\n";
   }
   //csv_output << "\n"; 
@@ -344,6 +363,8 @@ void FourierLink::transmit(const std::string &topicname, int run_num, time_t tim
   //TLOG() << "Constructed output" << std::endl;
   
   //Transmit
+  //TLOG() << "Exporting the following message: " << std::endl;
+  //TLOG() << csv_output.str() << std::endl;
   KafkaExport(csv_output.str(), topicname);
 
   //TLOG() << "Export complete" << std::endl;
@@ -398,7 +419,9 @@ void FourierLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode)
         chloc -= 128;
         fiberloc++;
       }
+      //TLOG() << "Fetching channel number" << std::endl;
       //unsigned int offline = channelMap.GetOfflineNumberFromDetectorElements(crateloc, slot, fiberloc, chloc, PdspChannelMapService::kFELIX);
+      //TLOG() << counter << "th frame, channel no. = " << offline << std::endl;
       unsigned int offline = ich;
       //unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
       //unsigned int apa = channelMap.APAFromOfflineChannel(offline);
@@ -408,21 +431,26 @@ void FourierLink::run(dunedaq::dataformats::TriggerRecord &tr, std::string mode)
 
       uint64_t timestamp = fr->get_wib_header()->get_timestamp();
       fouriervec[ich].enter(fr->get_channel(ich), timestamp);
+      timeseriesvec[ich].enter(fr->get_channel(ich), timestamp);
       //fouriervec[ich].enter(fr.get_channel(ich), 0);
       chanvec[ich] = chan_info.str();
     }
   }
   //TLOG() << "Went through " << counter << "frames and last time was = " << timeywimey << std::endl;
 
-  for (int ich=0; ich<256; ++ich)
-  {
-    fouriervec[ich].compute_fourier(1);
-  }
+  //for (int ich=0; ich<256; ++ich)
+  //{
+  //  fouriervec[ich].compute_fourier(1);
+  //}
 
   this->transmit("testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp(), chanvec[0]);
 
   for(int ich=0; ich<256; ++ich)
-    fouriervec[ich].save("Fourier/" + m_name + "-" + std::to_string(ich) + ".txt");
+  {
+    fouriervec[ich].compute_fourier(1);
+    fouriervec[ich].save_fourier("Fourier/" + m_name + "-" + std::to_string(ich) + ".txt");
+    timeseriesvec[ich].save("Fourier/" + m_name + "-" + std::to_string(ich) + "_timeseries.txt");
+  }
   m_run_mark = false;
 }
 
