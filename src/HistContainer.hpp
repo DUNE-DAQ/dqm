@@ -17,11 +17,49 @@
 
 #include "dataformats/TriggerRecord.hpp"
 
+#include "chmap/PdspChannelMapService.hpp"
+
 #include <fstream>
 #include <iostream>
 #include <ostream>
 #include <string>
 #include <vector>
+
+unsigned int getOfflineChannel(swtpg::PdspChannelMapService& channelMap, // NOLINT(build/unsigned)
+                                 const dunedaq::dataformats::WIBFrame* frame,
+                                 unsigned int ch) // NOLINT(build/unsigned)
+{
+  // handle 256 channels on two fibers -- use the channel
+  // map that assumes 128 chans per fiber (=FEMB) (Copied
+  // from PDSPTPCRawDecoder_module.cc)
+  int crate = frame->get_wib_header()->crate_no;
+  int slot = frame->get_wib_header()->slot_no;
+  int fiber = frame->get_wib_header()->fiber_no;
+
+  unsigned int fiberloc = 0; // NOLINT(build/unsigned)
+  if (fiber == 1) {
+    fiberloc = 1;
+  } else if (fiber == 2) {
+    fiberloc = 3;
+  } else {
+    TLOG() << " Fiber number " << fiber << " is expected to be 1 or 2 -- revisit logic";
+    fiberloc = 1;
+  }
+
+  unsigned int chloc = ch; // NOLINT(build/unsigned)
+  if (chloc > 127) {
+    chloc -= 128;
+    fiberloc++;
+  }
+
+  unsigned int crateloc = crate; // NOLINT(build/unsigned)
+  unsigned int offline =         // NOLINT(build/unsigned)
+    channelMap.GetOfflineNumberFromDetectorElements(
+      crateloc, slot, fiberloc, chloc, swtpg::PdspChannelMapService::kFELIX);
+  // printf("crate=%d slot=%d fiber=%d fiberloc=%d chloc=%d offline=%d\n",
+  //        crate, slot, fiber, fiberloc, chloc, offline);
+  return offline;
+}
 
 namespace dunedaq::dqm {
 
@@ -64,10 +102,18 @@ HistContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode, st
   auto wibframes = dec.decode(tr);
   std::uint64_t timestamp = 0; // NOLINT(build/unsigned)
 
+  std::unique_ptr<swtpg::PdspChannelMapService> channelmap;
+  std::string channel_map_rce = "chmap/protoDUNETPCChannelMap_RCE_v4.txt";
+  std::string channel_map_felix = "chmap/protoDUNETPCChannelMap_FELIX_v4.txt";
+  channelmap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
+
   for (auto fr : wibframes) {
 
     for (int ich = 0; ich < m_size; ++ich)
+    {
       histvec[ich].fill(fr->get_channel(ich));
+      TLOG() << "Channel test: ich = " << ich << ", offline channel = " << getOfflineChannel(*channelmap, fr, ich) << std::endl;
+    }
 
     // Debug mode - save to a file
     // if (mode != RunningMode::kLocalProcessing) continue;
