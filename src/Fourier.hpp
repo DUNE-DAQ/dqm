@@ -11,6 +11,8 @@
 // dqm
 #include "AnalysisModule.hpp"
 #include "Decoder.hpp"
+#include "Exporter.hpp"
+#include "dqm/Types.hpp"
 
 #include "dataformats/TriggerRecord.hpp"
 #include "logging/Logging.hpp"
@@ -34,12 +36,15 @@ class Fourier
   double find_value(uint64_t time); // NOLINT(build/unsigned)
   CArray fourier_prep(const std::vector<double>& input) const;
   CArray fourier_rebin(CArray input, double factor);
-  void fast_fourier_transform(CArray& x);
+  void fast_fourier_transform_1(CArray& x);
+  void fast_fourier_transform_2(CArray& x);
+
 
 public:
   uint64_t m_start;    // NOLINT(build/unsigned)
   uint64_t m_end;      // NOLINT(build/unsigned)
   uint64_t m_inc_size; // NOLINT(build/unsigned)
+  double m_freq_max;
   int m_npoints;
   std::vector<double> m_data;
   double m_rebin_factor;
@@ -97,9 +102,34 @@ Fourier::fourier_rebin(CArray input, double factor)
   return output;
 }
 
+//Cooley–Tukey FFT (in-place, divide-and-conquer)
+// Higher memory requirements and redundancy although more intuitive
+void Fourier::fast_fourier_transform_1(CArray& x)
+{ 
+  const size_t N = x.size();
+  if (N <= 1) return;
+           
+  // divide
+  CArray even = x[std::slice(0, N/2, 2)];
+  CArray  odd = x[std::slice(1, N/2, 2)];
+  
+  // conquer
+  fast_fourier_transform_1(even);
+  fast_fourier_transform_1(odd);
+  
+  // combine
+  for (size_t k = 0; k < N/2; ++k)
+  { 
+    Complex t = std::polar(1.0, -2 * 3.14159265358979323846264338328 * k / N) * odd[k];
+    x[k    ] = even[k] + t;
+    x[k+N/2] = even[k] - t;
+  }
+}
+
+
 // Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
 void
-Fourier::fast_fourier_transform(CArray& x)
+Fourier::fast_fourier_transform_2(CArray& x)
 {
   // DFT
   unsigned int N = x.size(), k = N, n;
@@ -141,31 +171,23 @@ Fourier::fast_fourier_transform(CArray& x)
 void
 Fourier::compute_fourier(double rebin_factor)
 {
-  // std::cout << "Computing FT" << std::endl;
   CArray input = fourier_prep(m_data);
-  // std::cout << "Input prepared" << std::endl;
-  fast_fourier_transform(input);
-  // m_data.clear();
-  // std::cout << "Transform performed" << std::endl;
-  // Unused
-  // int newsize = (int) input.size()/rebin_factor;
-  // std::cout << "Size of array after rebinning = " << newsize << std::endl;
-  CArray out_array(input);
-  // std::cout << "CArray set up" << std::endl;
-  // out_array = fourier_rebin(input, rebin_factor);
-  // std::cout << "Rebinning complete" << std::endl;
+  fast_fourier_transform_1(input);
+  //fast_fourier_transform_2(input);
+  int newsize = (int) input.size()/rebin_factor;
+  CArray out_array (newsize);
+  out_array = fourier_rebin(input, rebin_factor);
   m_rebin_factor = rebin_factor;
-  // std::cout << "Rebin factor saved" << std::endl;
-  m_fourier_transform.resize(input.size());
-  // std::cout << "Beginning loop" << std::endl;
-  for (size_t i = 0; i < out_array.size(); i++) {
-    // std::cout << "i = " << i << std::endl;
-    double val = static_cast<double>(out_array[i].real());
-    // std::cout << "val = " << val << std::endl;
+  m_fourier_transform.resize(newsize);
+  for (size_t i = 0; i < out_array.size(); i++)
+  {
+    double val = (double) std::abs(out_array[i]);
     m_fourier_transform[i] = val;
-    // std::cout << "Pushed back" << std::endl;
   }
-  // std::cout << "Completing" << std::endl;
+
+  double f_clock = 50E6;
+  double f_sampling = f_clock/(int)m_inc_size;
+  m_freq_max = f_sampling/2.0;
 }
 
 int
@@ -260,6 +282,7 @@ public:
   FourierLink(std::string name, int start, int end, int npoints);
 
   void run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode, std::string kafka_address);
+  void transmit(std::string &kafka_address, const std::string &topic_name, int run_num, time_t timestamp);
   bool is_running();
 };
 
@@ -274,21 +297,30 @@ FourierLink::FourierLink(std::string name, int start, int end, int npoints)
 }
 
 void
-FourierLink::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std::string)
+FourierLink::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std::string kafka_address)
 {
   m_run_mark = true;
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
 
   for (auto fr : wibframes) {
+    uint64_t timestamp = fr->get_wib_header()->get_timestamp();
     for (int ich = 0; ich < 256; ++ich) {
-      fouriervec[ich].enter(fr->get_channel(ich), 0);
+      //Fill time series
+      fouriervec[ich].enter(fr->get_channel(ich), timestamp);
     }
   }
 
   for (int ich = 0; ich < 256; ++ich) {
+    //Perform Fourier transform
+    fouriervec[ich].compute_fourier(1);
+    //Save text output
     fouriervec[ich].save("Fourier/" + m_name + "-" + std::to_string(ich) + ".txt");
   }
+
+  //Transmit via kafka
+  transmit(kafka_address, "testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
+  
   m_run_mark = false;
 }
 
@@ -297,6 +329,36 @@ FourierLink::is_running()
 {
   return m_run_mark;
 }
+
+void
+FourierLink::transmit(std::string &kafka_address, const std::string &topic_name, int run_num, time_t timestamp)
+{
+  std::stringstream csv_output;
+  std::string datasource = "TESTSOURCE";
+  std::string dataname   = this->m_name;
+  std::string axislabel = "TESTLABEL";
+  std::stringstream metadata;
+  //metadata << chaninf << " " << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end << " " << fouriervec[0].m_freq_max;
+  metadata << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end << " " << fouriervec[0].m_freq_max;
+
+  int subrun = 0;
+  int event = 0;
+
+  int fft_size = fouriervec[0].m_fourier_transform.size();
+  
+  //Construct CSV output
+  csv_output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp << ";" << metadata.str() << ";";
+  csv_output << axislabel << "\n";
+  for (int ich = 0; ich < 256; ++ich)
+  {
+    csv_output << "Fourier_" << ich+1 << "\n";
+    for (int i = 0; i < fft_size/2; i++) csv_output << fouriervec[ich].m_fourier_transform[i] << " ";
+    csv_output << "\n";
+  }
+
+  KafkaExport(kafka_address, csv_output.str(), topic_name);
+}
+
 
 } // namespace dunedaq::dqm
 
