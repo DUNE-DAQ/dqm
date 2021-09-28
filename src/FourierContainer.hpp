@@ -141,7 +141,7 @@ FourierContainer::transmit(std::string& kafka_address, const std::string& topicn
              << ";" << metadata.str() << ";";
   csv_output << axislabel << "\n";
   for (int ich = 0; ich < m_size; ++ich) {
-    csv_output << "APA_" << chanvec[ich].APA << " " << "Plane_" << chanvec[ich].Plane << " " << "Wire_" << chanvec[ich].Wire << " " << "GeoID_" << chanvec[ich].GeoID << " " << "Application_" << chanvec[ich].Application << " " << "Partition_" << chanvec[ich].Partition << "\n";
+    csv_output << chanvec[ich].APA << " " << chanvec[ich].Plane << " " << chanvec[ich].Wire << " " << chanvec[ich].GeoID << " " << chanvec[ich].Application << " " << chanvec[ich].Partition << "\n";
     for (int i = 0; i < fouriervec[ich].m_data.size() / 2; i++) csv_output << fouriervec[ich].m_data.at(i) << " ";
     csv_output << "\n";
   }
