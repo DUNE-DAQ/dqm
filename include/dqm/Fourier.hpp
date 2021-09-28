@@ -74,63 +74,6 @@ Fourier::fourier_prep(const std::vector<double>& input) const
   return output;
 }
 
-// CArray
-// Fourier::fourier_rebin(CArray input, double factor)
-// {
-//   // Unused
-//   int newsize = static_cast<int>(input.size() / factor);
-//   std::valarray<Complex> output(newsize);
-//   for (size_t i = 0; i < input.size(); i++) {
-//     int k = static_cast<int>(i) / factor;
-//     // std::cout << "i = " << i << ", k = " << k << std::endl;
-//     output[k] += input[i];
-//   }
-//   return output;
-// }
-
-// Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
-// void
-// Fourier::fast_fourier_transform(CArray& x)
-// {
-//   // DFT
-//   unsigned int N = x.size(), k = N, n;
-//   double thetaT = 3.14159265358979323846264338328L / N;
-//   Complex phiT = Complex(cos(thetaT), -sin(thetaT)), T;
-//   while (k > 1) {
-//     n = k;
-//     k >>= 1;
-//     phiT = phiT * phiT;
-//     T = 1.0L;
-//     for (unsigned int l = 0; l < k; l++) {
-//       for (unsigned int a = l; a < N; a += n) {
-//         unsigned int b = a + k;
-//         Complex t = x[a] - x[b];
-//         x[a] += x[b];
-//         x[b] = t * T;
-//       }
-//       T *= phiT;
-//     }
-//   }
-//   std::cout << "First part done" << std::endl;
-//   // Decimate
-//   unsigned int m = (unsigned int)log2(N);
-//   for (unsigned int a = 0; a < N; a++) {
-//     unsigned int b = a;
-//     // Reverse bits
-//     b = (((b & 0xaaaaaaaa) >> 1) | ((b & 0x55555555) << 1));
-//     b = (((b & 0xcccccccc) >> 2) | ((b & 0x33333333) << 2));
-//     b = (((b & 0xf0f0f0f0) >> 4) | ((b & 0x0f0f0f0f) << 4));
-//     b = (((b & 0xff00ff00) >> 8) | ((b & 0x00ff00ff) << 8));
-//     b = ((b >> 16) | (b << 16)) >> (32 - m);
-//     if (b > a) {
-//       Complex t = x[a];
-//       x[a] = x[b];
-//       x[b] = t;
-//     }
-//   }
-//   std::cout << "Second part done" << std::endl;
-// }
-
 void
 Fourier::fast_fourier_transform(CArray& x)
 {
@@ -157,32 +100,11 @@ Fourier::fast_fourier_transform(CArray& x)
 CArray
 Fourier::compute_fourier()
 {
-  // std::cout << "Computing FT" << std::endl;
   CArray input = fourier_prep(m_data);
   std::cout << "Input prepared" << std::endl;
   fast_fourier_transform(input);
-  // m_data.clear();
   std::cout << "Transform performed" << std::endl;
-  // Unused
-  // int newsize = (int) input.size()/rebin_factor;
-  // std::cout << "Size of array after rebinning = " << newsize << std::endl;
   return input;
-  // CArray out_array(input);
-  // std::cout << "CArray set up" << std::endl;
-  // out_array = fourier_rebin(input, rebin_factor);
-  // std::cout << "Rebinning complete" << std::endl;
-  // m_rebin_factor = rebin_factor;
-  // std::cout << "Rebin factor saved" << std::endl;
-  // m_fourier_transform.resize(input.size());
-  // std::cout << "Beginning loop" << std::endl;
-  // for (size_t i = 0; i < out_array.size(); i++) {
-  //   // std::cout << "i = " << i << std::endl;
-  //   double val = static_cast<double>(out_array[i].real());
-  //   // std::cout << "val = " << val << std::endl;
-  //   m_fourier_transform[i] = val;
-  //   // std::cout << "Pushed back" << std::endl;
-  // }
-  // std::cout << "Completing" << std::endl;
 }
 
 CArray
@@ -198,7 +120,6 @@ Fourier::compute_fourier_def()
       output[k] += m_data[m] * std::exp( Complex(0, -2) * M_PI * static_cast<double>(k) * static_cast<double>(m) / static_cast<double>(m_data.size()));
     }
   return output;
-
 }
 
 CArray
@@ -210,7 +131,6 @@ Fourier::compute_fourier_normalized()
   for (size_t k = 0; k < m_data.size() / 2; ++k)
     output[k] = 2. / m_npoints * abs(output[k]);
   return output;
-
 }
 
 

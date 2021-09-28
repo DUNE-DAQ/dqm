@@ -79,9 +79,8 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
   std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
 
-
+  //Populate Fourier vector with time series (+ associated channel info)
   for (auto fr : wibframes) {
-
     for (size_t ich = 0; ich < m_size; ++ich)
     {
       //Fill time series
@@ -95,31 +94,21 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
       chaninf.Wire = LocalWireNumber(*channelMap, offline);
       chanvec[ich] = chaninf;
     }
-
-    // Debug mode - save to a file
-    // if (mode != RunningMode::kLocalProcessing) continue;
-    // if (++frames_run == max_frames) // NOLINT(runtime/increment_decrement)
-    // {
-    //   timestamp = fr->get_wib_header()->get_timestamp();
-    //   if (mode == RunningMode::kLocalProcessing) {save_and_clean(timestamp);
-    //   } else if (mode == RunningMode::kNormal) {
-    //     transmit(kafka_address, "testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
-    //   }
-    //   frames_run = 0;
-    //   ++current_index;
-    //   if (current_index == 2000) {
-    //     ++filename_index;
-    //     current_index = 0;
-    //   }
-    // }
   }
-  // for (size_t ich = 0; ich < m_size; ++ich)
-  //   auto out = fouriervec[ich].compute_fourier_def();
 
-  // Transmit via kafka
-  // if (mode == RunningMode::kNormal){
-  //
-  // }
+  //Perform fast Fourier transforms
+  for (size_t ich = 0; ich < m_size; ++ich)
+  {
+    CArray fft = fouriervec[ich].compute_fourier();
+
+    for (size_t i = 0; i < fft.size(); ++i)
+    {
+      fouriervec[ich].m_data[i] = std::abs(fft[i]);
+    }
+  }
+
+  //Transmit via kafka
+  transmit(kafka_address, "testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
 
   m_run_mark = false;
 
@@ -152,7 +141,7 @@ FourierContainer::transmit(std::string& kafka_address, const std::string& topicn
   csv_output << axislabel << "\n";
   for (int ich = 0; ich < m_size; ++ich) {
     csv_output << "APA_" << chanvec[ich].APA << " " << "Plane_" << chanvec[ich].Plane << " " << "Wire_" << chanvec[ich].Wire << " " << "GeoID_" << chanvec[ich].GeoID << " " << "Application_" << chanvec[ich].Application << " " << "Partition_" << chanvec[ich].Partition << "\n";
-    for (int i = 0; i < fouriervec[ich].get_frequencies().size(); i++) csv_output << fouriervec[ich].get_frequencies().at(i) << " ";
+    for (int i = 0; i < fouriervec[ich].m_data.size() / 2; i++) csv_output << fouriervec[ich].m_data.at(i) << " ";
     csv_output << "\n";
   }
 
