@@ -12,7 +12,7 @@
 #include "AnalysisModule.hpp"
 #include "Decoder.hpp"
 #include "Exporter.hpp"
-#include "ChannelMapper.hpp"
+#include "dqm/ChannelMapper.hpp"
 #include "dqm/Fourier.hpp"
 #include "dqm/Types.hpp"
 
@@ -78,6 +78,7 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   std::string readout_share(readout_share_cstr);
   std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
   std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
+  channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
 
   //Populate Fourier vector with time series (+ associated channel info)
   for (auto fr : wibframes) {

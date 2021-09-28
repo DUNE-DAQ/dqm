@@ -12,7 +12,7 @@
 #include "AnalysisModule.hpp"
 #include "Decoder.hpp"
 #include "Exporter.hpp"
-#include "ChannelMapper.hpp"
+#include "dqm/ChannelMapper.hpp"
 #include "dqm/Hist.hpp"
 #include "dqm/Types.hpp"
 
@@ -82,6 +82,7 @@ HistContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode, st
   std::string readout_share(readout_share_cstr);
   std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
   std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
+  channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
 
   for (auto fr : wibframes) {
 
