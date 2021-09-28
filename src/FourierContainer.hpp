@@ -12,6 +12,7 @@
 #include "AnalysisModule.hpp"
 #include "Decoder.hpp"
 #include "Exporter.hpp"
+#include "ChannelMapper.hpp"
 #include "dqm/Fourier.hpp"
 #include "dqm/Types.hpp"
 
@@ -28,6 +29,7 @@ namespace dunedaq::dqm {
 class FourierContainer : public AnalysisModule
 {
   std::string m_name;
+  std::vector<ChannelInfo> chanvec;
   std::vector<Fourier> fouriervec;
   bool m_run_mark;
   size_t m_size;
@@ -49,7 +51,17 @@ public:
   , m_size(npoints)
 {
   for (size_t i = 0; i < m_size; ++i)
+  {
     fouriervec.emplace_back(Fourier(inc, npoints));
+    ChannelInfo chaninf;
+    chaninf.APA   = 9999;
+    chaninf.Plane = 9999;
+    chaninf.Wire  = 9999;
+    chaninf.GeoID       = "NULL";
+    chaninf.Application = "NULL";
+    chaninf.Partition   = "NULL";
+    chanvec.emplace_back(chaninf);
+  }
 }
 
 void
@@ -59,11 +71,30 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
   // std::uint64_t timestamp = 0; // NOLINT(build/unsigned)
+  
+  //Get channel map
+  std::unique_ptr<swtpg::PdspChannelMapService> channelMap;
+  const char* readout_share_cstr = getenv("READOUT_SHARE");
+  std::string readout_share(readout_share_cstr);
+  std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
+  std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
+
 
   for (auto fr : wibframes) {
 
     for (size_t ich = 0; ich < m_size; ++ich)
+    {
+      //Fill time series
       fouriervec[ich].fill(fr->get_channel(ich));
+   
+      //Fill channel info
+      int offline = getOfflineChannel(*channelMap, fr, ich);
+      ChannelInfo chaninf;
+      chaninf.APA = channelMap->APAFromOfflineChannel(offline);
+      chaninf.Plane = channelMap->PlaneFromOfflineChannel(offline);
+      chaninf.Wire = LocalWireNumber(*channelMap, offline);
+      chanvec[ich] = chaninf;
+    }
 
     // Debug mode - save to a file
     // if (mode != RunningMode::kLocalProcessing) continue;
@@ -109,7 +140,8 @@ FourierContainer::transmit(std::string& kafka_address, const std::string& topicn
   std::string dataname = this->m_name;
   std::string axislabel = "TESTLABEL";
   std::stringstream metadata;
-  // metadata << fouriervec[0].m_steps << " " << fouriervec[0].m_low << " " << fouriervec[0].m_high;
+  //METADATA NEEDS ENABLING
+  //metadata << fouriervec[0].m_inc_size << " " << fouriervec[0].m_start << " " << fouriervec[0].m_end << " " << fouriervec[0].m_freq_max;
 
   int subrun = 0;
   int event = 0;
@@ -118,12 +150,11 @@ FourierContainer::transmit(std::string& kafka_address, const std::string& topicn
   csv_output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp
              << ";" << metadata.str() << ";";
   csv_output << axislabel << "\n";
-  for (int ich = 0; ich < 256; ++ich) {
-    csv_output << "Histogram_" << ich + 1 << "\n";
-    // csv_output << fouriervec[ich].m_sum;
+  for (int ich = 0; ich < m_size; ++ich) {
+    csv_output << "APA_" << chanvec[ich].APA << " " << "Plane_" << chanvec[ich].Plane << " " << "Wire_" << chanvec[ich].Wire << " " << "GeoID_" << chanvec[ich].GeoID << " " << "Application_" << chanvec[ich].Application << " " << "Partition_" << chanvec[ich].Partition << "\n";
+    for (int i = 0; i < fouriervec[ich].get_frequencies().size(); i++) csv_output << fouriervec[ich].get_frequencies().at(i) << " ";
     csv_output << "\n";
   }
-  // csv_output << "\n";
 
   // Transmit
   KafkaExport(kafka_address, csv_output.str(), topicname);
