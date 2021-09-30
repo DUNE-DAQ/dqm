@@ -13,7 +13,7 @@
 
 #include "dataformats/TriggerRecord.hpp"
 
-#include "readout/chmap/PdspChannelMapService.hpp"
+#include "readout/chmap/PdspChannelMapService.cpp"
 
 //Global channel map object to avoid repeated creation and deletion
 
@@ -73,6 +73,13 @@ unsigned int LocalWireNumber(swtpg::PdspChannelMapService& channelMap,
   unsigned int local_channel = apa_channel - plane*800;
 
   return local_channel;
+}
+
+unsigned int GetPlane(swtpg::PdspChannelMapService& channelMap, 
+                             unsigned int offline)
+{
+  unsigned int plane = channelMap.PlaneFromOfflineChannel(offline);
+  return plane;
 }
 
 } //namespace dqm
