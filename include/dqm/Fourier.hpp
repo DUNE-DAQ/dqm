@@ -48,6 +48,8 @@ public:
   CArray compute_fourier_def();
   std::vector<double> get_frequencies();
 
+  void clean();
+
   // void save(const std::string& filename) const;
   // void save(std::ofstream& filehandle) const;
 
@@ -68,8 +70,8 @@ Fourier::fourier_prep(const std::vector<double>& input) const
   CArray output(input.size());
   for (size_t i = 0; i < input.size(); i++) {
     output[i] = input[i];
-    if (i < 100)
-      std::cout << "Prep " << output[i] << " " << input[i] << std::endl;
+    //if (i < 100)
+    //  std::cout << "Prep " << output[i] << " " << input[i] << std::endl;
   }
   return output;
 }
@@ -149,7 +151,14 @@ Fourier::get_frequencies()
 void
 Fourier::fill(double value) // NOLINT(build/unsigned)
 {
-  m_data.push_back(value);
+  if (m_data.size() < m_npoints) m_data.push_back(value);
+  //else TLOG() << "Cannot fill time series beyond declared size. Check that # of frames requested in config is consistent with declared length." << std::endl; 
+}
+
+void
+Fourier::clean()
+{
+  m_data.clear();
 }
 
 // void

@@ -137,11 +137,11 @@ DQMProcessor::RequestMaker()
 
   // Instances of analysis modules
   HistContainer hist("hist1s", 256, 100, 0, 5000);
-  FourierContainer fourier("fourier10s", 256, 0, 10);
+  FourierContainer fourier("fourier10s", 256, 25, 100);
 
   // Initial tasks
-  map[std::chrono::system_clock::now()] = {&hist, m_standard_dqm_hist.how_often, m_standard_dqm_hist.unavailable_time, nullptr, "Histogram every " + std::to_string(m_standard_dqm_hist.how_often) + " s"};
-  map[std::chrono::system_clock::now()] = {&fourier, m_standard_dqm_fourier.how_often, m_standard_dqm_fourier.unavailable_time, nullptr, "Fourier every " + std::to_string(m_standard_dqm_fourier.how_often) + " s"};
+  map[std::chrono::system_clock::now()] = {&hist, m_standard_dqm_hist.how_often, m_standard_dqm_hist.unavailable_time, nullptr, "hist"};
+  map[std::chrono::system_clock::now()] = {&fourier, m_standard_dqm_fourier.how_often, m_standard_dqm_fourier.unavailable_time, nullptr, "fourier"};
 
   // Main loop, running forever
   while (m_run_marker) {
@@ -193,7 +193,11 @@ DQMProcessor::RequestMaker()
     }
 
     // Now it's the time to do something
-    auto request = CreateRequest(m_links);
+
+    int num_frames = 1;
+    if (fr->second.name == "hist") num_frames = m_standard_dqm_hist.num_frames;
+    else if (fr->second.name == "fourier") num_frames = m_standard_dqm_fourier.num_frames;
+    auto request = CreateRequest(m_links, num_frames);
 
     try {
       m_sink->push(request, m_sink_timeout);
@@ -245,7 +249,7 @@ DQMProcessor::RequestMaker()
 }
 
 dfmessages::TriggerDecision
-DQMProcessor::CreateRequest(std::vector<dfmessages::GeoID> m_links)
+DQMProcessor::CreateRequest(std::vector<dfmessages::GeoID> m_links, int num_frames)
 {
   auto timestamp = m_time_est->get_timestamp_estimate();
   dfmessages::TriggerDecision decision;
@@ -257,7 +261,7 @@ DQMProcessor::CreateRequest(std::vector<dfmessages::GeoID> m_links)
   decision.trigger_timestamp = timestamp;
   decision.readout_type = dfmessages::ReadoutType::kMonitoring;
 
-  int number_of_frames = 1;
+  int number_of_frames = num_frames;
   int window_size = number_of_frames * 25;
 
   for (auto& link : m_links) {

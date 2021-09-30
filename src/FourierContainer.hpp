@@ -39,16 +39,16 @@ public:
 
   void run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode = RunningMode::kNormal, std::string kafka_address="");
   void transmit(std::string &kafka_address, const std::string& topicname, int run_num, time_t timestamp);
-  // void clean();
+  void clean();
   // void save_and_clean(uint64_t timestamp); // NOLINT(build/unsigned)
   bool is_running();
 
 };
 
-  FourierContainer::FourierContainer(std::string name, int sizedouble, double inc, int npoints)
+  FourierContainer::FourierContainer(std::string name, int nfouriers, double inc, int npoints)
   : m_name(name)
   , m_run_mark(false)
-  , m_size(npoints)
+  , m_size(nfouriers)
 {
   for (size_t i = 0; i < m_size; ++i)
   {
@@ -81,7 +81,10 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
 
   //Populate Fourier vector with time series (+ associated channel info)
+  int framecounter = 0;
+  TLOG() << "Looping over " << wibframes.size() << " WIB frames" << std::endl;
   for (auto fr : wibframes) {
+    framecounter++;
     for (size_t ich = 0; ich < m_size; ++ich)
     {
       //Fill time series
@@ -100,7 +103,9 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   //Perform fast Fourier transforms
   for (size_t ich = 0; ich < m_size; ++ich)
   {
+    TLOG() << "Time series " << ich << " has been populated with " << fouriervec[ich].m_data.size() << " elements" << std::endl;
     CArray fft = fouriervec[ich].compute_fourier();
+    TLOG() << "Fourier vector has size " << fft.size() << std::endl;
 
     for (size_t i = 0; i < fft.size(); ++i)
     {
@@ -113,7 +118,7 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
 
   m_run_mark = false;
 
-  // clean();
+  clean();
 }
 
 bool
@@ -149,16 +154,16 @@ FourierContainer::transmit(std::string& kafka_address, const std::string& topicn
   // Transmit
   KafkaExport(kafka_address, csv_output.str(), topicname);
 
-  // clean();
+  //clean();
 }
 
-// void
-// FourierContainer::clean()
-// {
-//   for (int ich = 0; ich < m_size; ++ich) {
-//     fouriervec[ich].clean();
-//   }
-// }
+void
+FourierContainer::clean()
+{
+  for (int ich = 0; ich < m_size; ++ich) {
+    fouriervec[ich].clean();
+  }
+}
 
 // void
 // FourierContainer::save_and_clean(uint64_t timestamp) // NOLINT(build/unsigned)

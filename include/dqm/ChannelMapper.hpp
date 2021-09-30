@@ -13,7 +13,7 @@
 
 #include "dataformats/TriggerRecord.hpp"
 
-#include "readout/chmap/PdspChannelMapService.hpp"
+#include "readout/chmap/PdspChannelMapService.cpp"
 
 //Global channel map object to avoid repeated creation and deletion
 
