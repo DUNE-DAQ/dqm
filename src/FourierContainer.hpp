@@ -37,11 +37,13 @@ class FourierContainer : public AnalysisModule
 public:
   FourierContainer(std::string name, int size, double inc, int npoints);
 
-  void run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode = RunningMode::kNormal, std::string kafka_address="");
+  void run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode = RunningMode::kLocalProcessing, std::string kafka_address="");
   void transmit(std::string &kafka_address, const std::string& topicname, int run_num, time_t timestamp);
   void clean();
-  // void save_and_clean(uint64_t timestamp); // NOLINT(build/unsigned)
+  void save_and_clean(uint64_t timestamp); // NOLINT(build/unsigned)
   bool is_running();
+
+  int filename_index = 0;
 
 };
 
@@ -65,12 +67,11 @@ public:
 }
 
 void
-FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std::string kafka_address)
+FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode, std::string kafka_address)
 {
   m_run_mark = true;
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(tr);
-  // std::uint64_t timestamp = 0; // NOLINT(build/unsigned)
   
   //Get channel map
   std::unique_ptr<swtpg::PdspChannelMapService> channelMap;
@@ -81,10 +82,8 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
 
   //Populate Fourier vector with time series (+ associated channel info)
-  int framecounter = 0;
   TLOG() << "Looping over " << wibframes.size() << " WIB frames" << std::endl;
   for (auto fr : wibframes) {
-    framecounter++;
     for (size_t ich = 0; ich < m_size; ++ich)
     {
       //Fill time series
@@ -114,11 +113,21 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode, std:
   }
 
   //Transmit via kafka
-  transmit(kafka_address, "testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
+  if (mode == RunningMode::kLocalProcessing)
+  {
+    uint64_t timestamp = wibframes.back()->get_wib_header()->get_timestamp();
+    save_and_clean(timestamp);
+    filename_index++;
+  }
+  else if (mode == RunningMode::kNormal)
+  {
+    transmit(kafka_address, "testdunedqm", tr.get_header_ref().get_run_number(), tr.get_header_ref().get_trigger_timestamp());
+    clean();
+  }
 
   m_run_mark = false;
 
-  clean();
+  //clean();
 }
 
 bool
@@ -165,21 +174,23 @@ FourierContainer::clean()
   }
 }
 
-// void
-// FourierContainer::save_and_clean(uint64_t timestamp) // NOLINT(build/unsigned)
-// {
-//   std::ofstream file;
-//   file.open("Hist/" + m_name + "-" + std::to_string(filename_index) + ".txt", std::ios_base::app);
-//   file << timestamp << std::endl;
+void
+FourierContainer::save_and_clean(uint64_t timestamp) // NOLINT(build/unsigned)
+{
+  std::ofstream file;
+  file.open("Fourier/" + m_name + "-" + std::to_string(filename_index) + ".txt", std::ios_base::app);
+  file << timestamp << std::endl;
 
-//   for (int ich = 0; ich < m_size; ++ich) {
-//     file << fouriervec[ich].m_sum << " ";
-//   }
-//   file << std::endl;
-//   file.close();
+  for (int ich = 0; ich < m_size; ++ich) {
+    file << chanvec[ich].APA << " " << chanvec[ich].Plane << " " << chanvec[ich].Wire << " " << chanvec[ich].GeoID << " " << chanvec[ich].Application << " " << chanvec[ich].Partition << std::endl;
+    for (int i = 0; i < fouriervec[ich].m_data.size() / 2; i++) file << fouriervec[ich].m_data.at(i) << " ";
+    file << std::endl;
+  }
+  file << std::endl;
+  file.close();
 
-//   clean();
-// }
+  clean();
+}
 
 } // namespace dunedaq::dqm
 
