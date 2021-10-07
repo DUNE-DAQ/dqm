@@ -67,14 +67,9 @@ Fourier::Fourier(double inc, int npoints) // NOLINT(build/unsigned)
 CArray
 Fourier::fourier_prep(const std::vector<double>& input) const
 {
-  //Compute mean in order to centre time series around 0 in y 
-  double mean = 0;
-  for (size_t i = 0; i < input.size(); i++) mean += input[i];
-  mean = (double) mean/(input.size());
-  
   CArray output(input.size());
   for (size_t i = 0; i < input.size(); i++) {
-    output[i] = input[i] - mean;
+    output[i] = input[i];
     //if (i < 100)
     //  std::cout << "Prep " << output[i] << " " << input[i] << std::endl;
   }

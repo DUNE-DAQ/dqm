@@ -103,13 +103,15 @@ FourierContainer::run(dunedaq::dataformats::TriggerRecord& tr, RunningMode mode,
   for (size_t ich = 0; ich < m_size; ++ich)
   {
     TLOG() << "Time series " << ich << " has been populated with " << fouriervec[ich].m_data.size() << " elements" << std::endl;
-    CArray fft = fouriervec[ich].compute_fourier();
+    CArray fft = fouriervec[ich].compute_fourier_normalized();
     TLOG() << "Fourier vector has size " << fft.size() << std::endl;
 
     for (size_t i = 0; i < fft.size(); ++i)
     {
       fouriervec[ich].m_data[i] = std::abs(fft[i]);
     }
+    TLOG() << "Fourier vector: " << std::endl;
+    for (size_t i = 0; i < fft.size()/2; ++i) TLOG() << fft[i] << ", abs value = " << std::abs(fft[i]) << std::endl;
   }
 
   //Transmit via kafka
