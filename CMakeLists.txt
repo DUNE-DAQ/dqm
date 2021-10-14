@@ -21,6 +21,7 @@ daq_codegen(*.jsonnet TEMPLATES Structs.hpp.j2 Nljs.hpp.j2 )
 daq_codegen(*info.jsonnet DEP_PKGS opmonlib TEMPLATES opmonlib/InfoStructs.hpp.j2 opmonlib/InfoNljs.hpp.j2 )
 
 daq_add_application(trigger_transform trigger_transform.cxx LINK_LIBRARIES appfwk::appfwk readout::readout dataformats::dataformats HighFive RdKafka::rdkafka++ ers::ers timinglibs::timinglibs)
+daq_add_application(trigger_adc_frequency trigger_adc_frequency.cxx LINK_LIBRARIES appfwk::appfwk readout::readout dataformats::dataformats HighFive RdKafka::rdkafka++ ers::ers timinglibs::timinglibs)
 
 
 # We put here the name of our class, and the libraries we want to link with

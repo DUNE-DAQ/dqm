@@ -10,6 +10,7 @@
 #include <ers/StreamFactory.hpp>
 #include "dqm/ChannelMapper.hpp"
 #include <stdlib.h>     //for using the function sleep
+#include <dirent.h>
 
 
 namespace dunedaq
@@ -46,7 +47,11 @@ std::string m_port;
 std::string m_topic;
 int apa_count;
 int fragments_count;
-int interval_of_capture = 100;
+int channel_count =  0;
+int interval_of_capture = 1;
+std::vector<std::vector<int>> adc_values;
+std::vector<int> plane_number_list;
+std::vector<int> coordinate_list;
 
 std::unique_ptr<swtpg::PdspChannelMapService> channelMap;
 const char* readout_share_cstr = getenv("READOUT_SHARE");
@@ -54,11 +59,106 @@ std::string readout_share(readout_share_cstr);
 std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
 std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
 
+bool one_link = false;
+
+
+std::vector<std::vector<std::array<int, 2>>> TransformFrequencyADC(std::vector<std::vector<int>> adc_values_channels)
+{
+  std::vector<std::vector<std::array<int, 2>>> adc_values_frequency_channels;
+
+  for(int i = 0; i < adc_values_channels.size(); i++ )
+  {
+    std::vector<std::array<int, 2>> adc_values_frequency;
+    std::vector<int> adc_values = adc_values_channels[i];
+    sort(adc_values.begin(), adc_values.end());
+
+    for(auto it = std::cbegin(adc_values); it != std::cend(adc_values); ) {  
+
+        int dups = std::count(it, std::cend(adc_values), *it);
+        if ( dups > 1 )
+            //std::cout << *it << " is a duplicated number, times: " << dups << std::endl;
+            adc_values_frequency.push_back({*it, dups});
+        for(auto last = *it;*++it == last;);
+    }
+
+    adc_values_frequency_channels.push_back(adc_values_frequency);
+  }
+
+  return adc_values_frequency_channels;
+}
+
+std::string AdcFrequenciesToText(std::vector<std::vector<std::array<int, 2>>> adc_values_frequency_channels, std::vector<int> plane_number_list, std::vector<int> coordinate_list)
+{
+  std::string message = std::to_string(adc_values_frequency_channels.size()-1) + "\n";
+
+  for(int i = 0; i < adc_values_frequency_channels.size(); i++ )
+  {
+    if(adc_values_frequency_channels[i].size() != 0)
+    {
+      message += std::to_string(plane_number_list[i]) + " " + std::to_string(coordinate_list[i]) + "\n";
+      std::string adc_values_string;
+      std::string adc_values_frequency_string;
+      for(int j = 0; j < adc_values_frequency_channels[i].size();j++)
+      {
+        adc_values_string += std::to_string(adc_values_frequency_channels[i][j][0]) + " ";
+        adc_values_frequency_string += std::to_string(adc_values_frequency_channels[i][j][1]) + " ";
+      }
+      adc_values_string = adc_values_string.substr(0, adc_values_string.size()-1);
+      adc_values_frequency_string = adc_values_frequency_string.substr(0, adc_values_frequency_string.size()-1);
+      message += adc_values_string + "\n";
+      message += adc_values_frequency_string + "\n";
+
+      //std::cout << "adc_values_string : "<< adc_values_string << std::endl;
+
+/*
+      std::cout << std::endl;
+      std::cout << "channel count : "<< std::to_string(i) << std::endl;
+      std::cout << "adc_values_frequency_channels.size() : "<< std::to_string(adc_values_frequency_channels.size()) << std::endl;
+      std::cout << "header values : " << std::to_string(coordinate_list[i]) << " " << std::to_string(coordinate_list[i]) << std::endl;
+      std::cout << "adc_values_string : "<< adc_values_string << std::endl;
+      std::cout << "adc_values_frequency_string : "<< adc_values_frequency_string << std::endl;
+      std::cout << "adc_values_frequency_channels[i].size() : "<< std::to_string(adc_values_frequency_channels[i].size()) << std::endl;*/
+    }
+  }
+  return message;
+}
+
+void SendKafkaMessage(std::string message_header, std::string message)
+{
+  message = message_header + message;
+  //std::cout << message << std::endl;
+  try
+  {
+    // serialize it to BSON
+    RdKafka::ErrorCode err = m_producer->produce(m_topic, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY, const_cast<char *>(message.c_str()), message.size(), nullptr, 0, 0, nullptr, nullptr);
+    //std::cout << message_to_kafka << std::endl;
+    //if (err != RdKafka::ERR_NO_ERROR) { dunedaq::kafkaraw::CannotProduce(ERS_HERE, "% Failed to produce " + RdKafka::err2str(err));}
+    if (err != RdKafka::ERR_NO_ERROR)
+    {
+      std::cout << "% Failed to produce " + RdKafka::err2str(err);
+    }
+    else
+    {
+      //std::cout << "Frame sent : " << message_to_kafka << std::endl;
+      sleep(0.1); //For the kafka broker not to be overhelmed... To improve
+    }
+  }
+  catch (const std::exception &e)
+  {
+    std::string s = e.what();
+    std::cout << s << std::endl;
+    //ers::error(dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Error [" + s + "] message(s) were not delivered"));
+  }
+}
+
 void readDataset(std::string path_dataset, void *buff)
 {
 
   std::string tr_header = "TriggerRecordHeader";
-  if (path_dataset.find(tr_header) != std::string::npos)
+  size_t raw_data_packets = 0;
+  dunedaq::dataformats::Fragment frag(buff, dunedaq::dataformats::Fragment::BufferAdoptionMode::kReadOnlyMode);
+
+  if (path_dataset.find(tr_header) != std::string::npos) //At the end of each record
   {
     std::cout << "--- TR header dataset" << path_dataset << std::endl;
     dunedaq::dataformats::TriggerRecordHeader trh(buff);
@@ -69,13 +169,31 @@ void readDataset(std::string path_dataset, void *buff)
               << " Max Swquence: " << trh.get_max_sequence_number() << std::endl;
     std::cout << "============================================================" << std::endl;
 
-    sleep(60); //For the kafka broker not to be overhelmed... To improve
+/*
+    std::cout << "Length : " << std::to_string(plane_number_list.size()) << std::endl;
+    for (int i = 0; i < plane_number_list.size(); i++)
+    {
+      std::cout << std::to_string(i) << " " << std::to_string(plane_number_list[i]) << " " << std::to_string(coordinate_list[i]) << " " << std::to_string(adc_values[i].size()) << " " << std::to_string(adc_values[i][0]) << std::endl;
+    }*/
 
+    std::string message_header = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(raw_data_packets/interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";";
+
+    SendKafkaMessage(message_header, AdcFrequenciesToText(TransformFrequencyADC(adc_values), plane_number_list, coordinate_list));
+
+
+    sleep(10); //For the kafka broker not to be overhelmed... To improve
+
+    plane_number_list = {};
+    coordinate_list = {};
+    adc_values = {};
+    channel_count =  0;
   }
-  else
+  else if(!one_link)
   {
+    //TO SEND ONLY FIRST LINK
+    one_link = true;
+
     std::cout << "+++ Fragment dataset" << path_dataset << std::endl;
-    dunedaq::dataformats::Fragment frag(buff, dunedaq::dataformats::Fragment::BufferAdoptionMode::kReadOnlyMode);
     // Here I can now look into the raw data
     // As an example, we print a couple of attributes of the Fragment header and then dump the first WIB frame.
     if (frag.get_fragment_type() == dunedaq::dataformats::FragmentType::kTPCData)
@@ -87,79 +205,45 @@ void readDataset(std::string path_dataset, void *buff)
 
       // Get pointer to the first WIB frame
       auto wfptr = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data());
-      size_t raw_data_packets = (frag.get_size() - sizeof(dunedaq::dataformats::FragmentHeader)) / sizeof(dunedaq::dataformats::WIBFrame);
+      raw_data_packets = (frag.get_size() - sizeof(dunedaq::dataformats::FragmentHeader)) / sizeof(dunedaq::dataformats::WIBFrame);
 
       //Message to be sent by kafka
       //Sends first informations about the trigger record and then about the WIB frame sent
-      std::string message_to_kafka;
       std::cout << "Fragment contains " << raw_data_packets << " WIB frames"
                 << " Total fragments : " << std::to_string(fragments_count) << std::endl;
+
+
+      //From first frame, extracts plane and channel coordinate
+      for (int j = 0; j < 256; j++)
+      {
+        channel_count ++;
+        unsigned int offline = dunedaq::dqm::getOfflineChannel(*channelMap, wfptr, j);
+        unsigned int channel_coordinate = dunedaq::dqm::LocalWireNumber(*channelMap, offline);
+        unsigned int plane = dunedaq::dqm::GetPlane(*channelMap, offline);
+        plane_number_list.push_back(plane);
+        coordinate_list.push_back(channel_coordinate);
+      }
+
       for (size_t i = 0; i < raw_data_packets; i += interval_of_capture)
       {
-        message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(raw_data_packets/interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";";
 
         auto wfptr_i = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data() + i * sizeof(dunedaq::dataformats::WIBFrame));
-        //std::cout << "frame : " << std::to_string(i) << "   Frame size : " << std::to_string(sizeof(dunedaq::dataformats::WIBFrame)) << "   Timestamp : " << std::to_string(wfptr_i->get_wib_header()->get_timestamp());
 
         //Adds wib frame id
-        message_to_kafka += std::to_string(i/interval_of_capture) + "\n";
 
         for (int j = 0; j < 256; j++)
         {
-          unsigned int offline = dunedaq::dqm::getOfflineChannel(*channelMap, wfptr_i, j);
-          unsigned int channel_coordinate = dunedaq::dqm::LocalWireNumber(*channelMap, offline);
-          unsigned int plane = dunedaq::dqm::GetPlane(*channelMap, offline);
-          //Adds plane and channel position
-          
-          /*if(j == 0)
+          //if channel count smaller than vector of values, append data to existing channel history, else add new channel
+          if(channel_count < adc_values.size())
           {
-            std::cout << "   channel : " << std::to_string(channel_coordinate) << "   plane : "<< std::to_string(plane) << "   adc : " << wfptr_i->get_channel(j) << std::endl;
-          }*/
-          message_to_kafka += std::to_string(plane) + " " + std::to_string(channel_coordinate)+ "\n";
-
-          message_to_kafka += std::to_string(wfptr_i->get_channel(j)) + "\n";
-
-          //std::cout << "Channel " << std::to_string(j) << " : " << wfptr->get_channel(j) << std::endl;
-        }
-        //std::cout << message_to_kafka << std::endl;
-
-        /*
-            // print first WIB header
-            if (i==0) {
-                  std::cout << "First WIB header:"<< *(wfptr->get_wib_header());
-                  //std::cout << "Printout sampled timestamps in WIB headers: " ;
-                  //std::cout << "Channels :"<< *(wfptr) << std::endl;
-                  for(int j = 0; j< 256; j++)
-                  {
-                    std::cout << "Channel " << std::to_string(j) << " : " << wfptr->get_channel(j) << std::endl;
-                  }
-            }*/
-        // printout timestamp every now and then, only as example of accessing data...
-        //if(i%1000 == 0) std::cout << "Timestamp " << i << ": " << wf1ptr->get_timestamp() << " ";
-        //kafka_exporter(message, "dunedqm-incommingchannel2");
-
-        try
-        {
-          // serialize it to BSON
-          RdKafka::ErrorCode err = m_producer->produce(m_topic, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY, const_cast<char *>(message_to_kafka.c_str()), message_to_kafka.size(), nullptr, 0, 0, nullptr, nullptr);
-          //std::cout << message_to_kafka << std::endl;
-          //if (err != RdKafka::ERR_NO_ERROR) { dunedaq::kafkaraw::CannotProduce(ERS_HERE, "% Failed to produce " + RdKafka::err2str(err));}
-          if (err != RdKafka::ERR_NO_ERROR)
-          {
-            std::cout << "% Failed to produce " + RdKafka::err2str(err);
+            adc_values[channel_count -256 + j].push_back({wfptr_i->get_channel(j)});
           }
           else
           {
-            //std::cout << "Frame sent : " << message_to_kafka << std::endl;
-            sleep(0.1); //For the kafka broker not to be overhelmed... To improve
+            adc_values.push_back({wfptr_i->get_channel(j)});
           }
         }
-        catch (const std::exception &e)
-        {
-          std::string s = e.what();
-          //std::cout << s << std::endl;
-          //ers::error(dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Error [" + s + "] message(s) were not delivered"));
-        }
+
       }
 
       sleep(1); //For the kafka broker not to be overhelmed... To improve
@@ -173,10 +257,14 @@ void readDataset(std::string path_dataset, void *buff)
   }
 }
 
+
+
+
 // Recursive function to traverse the HDF5 file
 void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, std::vector<std::string> &path_list)
 {
   int link_count = 0;
+  bool is_link = false;
   std::vector<std::string> childNames = parent_group.listObjectNames();
   for (auto &child_name : childNames)
   {
@@ -189,6 +277,7 @@ void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, st
       if(child_name.find("TriggerRecordHeader"))
       {
         link_count++;
+        is_link = true;
       }
       
       //std::cout << "Dataset IN IF : " << child_name << std::endl;
@@ -209,7 +298,7 @@ void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, st
       exploreSubGroup(child_group, new_path, path_list);
     }
   }
-  fragments_count = link_count;
+  if (is_link) {fragments_count = link_count;}
 }
 
 std::vector<std::string> traverseFile(HighFive::File input_file, int num_trs)
@@ -300,6 +389,21 @@ int main(int argc, char **argv)
     dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Producer creation error : " + errstr);
   }
 
+  DIR *dir; struct dirent *diread;
+  std::vector<std::string> files;
+
+  if ((dir = opendir("/eos/home-y/yadonon/TriggerRecords/")) != nullptr) {
+      while ((diread = readdir(dir)) != nullptr) {
+          files.push_back("/eos/home-y/yadonon/TriggerReccords/" + std::string(diread->d_name));
+      }
+      closedir (dir);
+  } else {
+      perror ("opendir");
+      return EXIT_FAILURE;
+  }
+
+  for (auto file : files) std::cout << file << std::endl;
+  
   HighFive::File file("/eos/home-y/yadonon/swtest_run000002_0000_glehmann_20211001T115720.hdf5", HighFive::File::ReadOnly);
 
   std::vector<std::string> data_path = traverseFile(file, num_trs);
