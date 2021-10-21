@@ -5,48 +5,47 @@
 #include <highfive/H5File.hpp>
 #include <highfive/H5Object.hpp>
 #include <librdkafka/rdkafkacpp.h>
+#include <ers/StreamFactory.hpp>
 #include "dataformats/TriggerRecord.hpp"
 #include "dataformats/wib/WIBFrame.hpp"
-#include <ers/StreamFactory.hpp>
+#include "boost/program_options.hpp"
 #include "dqm/ChannelMapper.hpp"
 #include <stdlib.h>     //for using the function sleep
+#include <dirent.h>
+#include <fstream>
+
+namespace bpo = boost::program_options;
 
 
 namespace dunedaq
 { // namespace dunedaq
 
-  ERS_DECLARE_ISSUE(triggertransform, CannotPostToDb,
-                    "Cannot post to Influx DB : " << error,
+  ERS_DECLARE_ISSUE(triggertransform, CannotOpenFile,
+                    "Cannot open file : " << error,
                     ((std::string)error))
 
-  ERS_DECLARE_ISSUE(triggertransform, CannotCreateConsumer,
-                    "Cannot create consumer : " << fatal,
-                    ((std::string)fatal))
+  ERS_DECLARE_ISSUE(triggertransform, ErrorReadingFile,
+                    "Error reading : " << error,
+                    ((std::string)error))
 
-  ERS_DECLARE_ISSUE(triggertransform, CannotConsumeMessage,
-                    "Cannot consume message : " << error,
+  ERS_DECLARE_ISSUE(triggertransform, CannotOpenFolder,
+                    "Cannot open folder : " << error,
                     ((std::string)error))
 
   ERS_DECLARE_ISSUE(triggertransform, IncorrectParameters,
                     "Incorrect parameters : " << fatal,
                     ((std::string)fatal))
 
-  ERS_DECLARE_ISSUE(kafkaraw, CannotProduce,
+  ERS_DECLARE_ISSUE(triggertransform, CannotProduce,
                     "Cannot produce to kafka " << error,
                     ((std::string)error))
-
-  ERS_DECLARE_ISSUE(kafkaraw, WrongURI,
-                    "Incorrect URI" << uri,
-                    ((std::string)uri))
 } // namespace dunedaq
 
 RdKafka::Producer *m_producer;
-std::string m_host;
-std::string m_port;
-std::string m_topic;
+std::string topic;
 int apa_count;
 int fragments_count;
-int interval_of_capture = 100;
+int interval_of_capture;
 
 std::unique_ptr<swtpg::PdspChannelMapService> channelMap;
 const char* readout_share_cstr = getenv("READOUT_SHARE");
@@ -56,7 +55,6 @@ std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_
 
 void readDataset(std::string path_dataset, void *buff)
 {
-
   std::string tr_header = "TriggerRecordHeader";
   if (path_dataset.find(tr_header) != std::string::npos)
   {
@@ -69,7 +67,7 @@ void readDataset(std::string path_dataset, void *buff)
               << " Max Swquence: " << trh.get_max_sequence_number() << std::endl;
     std::cout << "============================================================" << std::endl;
 
-    sleep(60); //For the kafka broker not to be overhelmed... To improve
+    sleep(20); //For the kafka broker not to be overhelmed... To improve
 
   }
   else
@@ -86,7 +84,7 @@ void readDataset(std::string path_dataset, void *buff)
                 << " GeoID: " << frag.get_element_id() << std::endl;
 
       // Get pointer to the first WIB frame
-      auto wfptr = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data());
+      //auto wfptr = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data());
       size_t raw_data_packets = (frag.get_size() - sizeof(dunedaq::dataformats::FragmentHeader)) / sizeof(dunedaq::dataformats::WIBFrame);
 
       //Message to be sent by kafka
@@ -96,10 +94,9 @@ void readDataset(std::string path_dataset, void *buff)
                 << " Total fragments : " << std::to_string(fragments_count) << std::endl;
       for (size_t i = 0; i < raw_data_packets; i += interval_of_capture)
       {
-        message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(raw_data_packets/interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";";
+        message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";" + std::to_string(raw_data_packets) + ";";
 
         auto wfptr_i = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data() + i * sizeof(dunedaq::dataformats::WIBFrame));
-        //std::cout << "frame : " << std::to_string(i) << "   Frame size : " << std::to_string(sizeof(dunedaq::dataformats::WIBFrame)) << "   Timestamp : " << std::to_string(wfptr_i->get_wib_header()->get_timestamp());
 
         //Adds wib frame id
         message_to_kafka += std::to_string(i/interval_of_capture) + "\n";
@@ -110,60 +107,37 @@ void readDataset(std::string path_dataset, void *buff)
           unsigned int channel_coordinate = dunedaq::dqm::LocalWireNumber(*channelMap, offline);
           unsigned int plane = dunedaq::dqm::GetPlane(*channelMap, offline);
           //Adds plane and channel position
-          
-          /*if(j == 0)
-          {
-            std::cout << "   channel : " << std::to_string(channel_coordinate) << "   plane : "<< std::to_string(plane) << "   adc : " << wfptr_i->get_channel(j) << std::endl;
-          }*/
           message_to_kafka += std::to_string(plane) + " " + std::to_string(channel_coordinate)+ "\n";
-
           message_to_kafka += std::to_string(wfptr_i->get_channel(j)) + "\n";
 
-          //std::cout << "Channel " << std::to_string(j) << " : " << wfptr->get_channel(j) << std::endl;
         }
-        //std::cout << message_to_kafka << std::endl;
-
-        /*
-            // print first WIB header
-            if (i==0) {
-                  std::cout << "First WIB header:"<< *(wfptr->get_wib_header());
-                  //std::cout << "Printout sampled timestamps in WIB headers: " ;
-                  //std::cout << "Channels :"<< *(wfptr) << std::endl;
-                  for(int j = 0; j< 256; j++)
-                  {
-                    std::cout << "Channel " << std::to_string(j) << " : " << wfptr->get_channel(j) << std::endl;
-                  }
-            }*/
-        // printout timestamp every now and then, only as example of accessing data...
-        //if(i%1000 == 0) std::cout << "Timestamp " << i << ": " << wf1ptr->get_timestamp() << " ";
-        //kafka_exporter(message, "dunedqm-incommingchannel2");
-
         try
         {
           // serialize it to BSON
-          RdKafka::ErrorCode err = m_producer->produce(m_topic, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY, const_cast<char *>(message_to_kafka.c_str()), message_to_kafka.size(), nullptr, 0, 0, nullptr, nullptr);
-          //std::cout << message_to_kafka << std::endl;
-          //if (err != RdKafka::ERR_NO_ERROR) { dunedaq::kafkaraw::CannotProduce(ERS_HERE, "% Failed to produce " + RdKafka::err2str(err));}
+           
+          RdKafka::ErrorCode err = m_producer->produce(topic, RdKafka::Topic::PARTITION_UA, RdKafka::Producer::RK_MSG_COPY, const_cast<char *>(message_to_kafka.c_str()), message_to_kafka.size(), nullptr, 0, 0, nullptr, nullptr);
+
+         
+
           if (err != RdKafka::ERR_NO_ERROR)
           {
-            std::cout << "% Failed to produce " + RdKafka::err2str(err);
+            ers::error(dunedaq::triggertransform::CannotProduce(ERS_HERE, "% Failed to produce " + RdKafka::err2str(err)));
           }
           else
           {
             //std::cout << "Frame sent : " << message_to_kafka << std::endl;
-            sleep(0.1); //For the kafka broker not to be overhelmed... To improve
+            sleep(0.02); //For the kafka broker not to be overhelmed... To improve
           }
         }
         catch (const std::exception &e)
         {
           std::string s = e.what();
           //std::cout << s << std::endl;
-          //ers::error(dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Error [" + s + "] message(s) were not delivered"));
+          ers::error(dunedaq::triggertransform::CannotProduce(ERS_HERE, "Error [" + s + "] message(s) were not delivered"));
         }
       }
 
-      sleep(1); //For the kafka broker not to be overhelmed... To improve
-
+      sleep(1);
       std::cout << std::endl;
     }
     else
@@ -177,6 +151,7 @@ void readDataset(std::string path_dataset, void *buff)
 void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, std::vector<std::string> &path_list)
 {
   int link_count = 0;
+  bool is_link = false;
   std::vector<std::string> childNames = parent_group.listObjectNames();
   for (auto &child_name : childNames)
   {
@@ -188,6 +163,7 @@ void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, st
     {
       if(child_name.find("TriggerRecordHeader"))
       {
+        is_link = true;
         link_count++;
       }
       
@@ -197,11 +173,7 @@ void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, st
     }
     else if (child_type == HighFive::ObjectType::Group)
     {
-      //std::cout << "Group: " << child_name << std::endl;
-      //std::cout << "VECTOR LENGTH : " << std::to_string(parent_group.listObjectNames().size()) << std::endl;
       apa_count = parent_group.listObjectNames().size();
-
-      //std::cout << std::to_string(apa_count) << std::endl;
 
       HighFive::Group child_group = parent_group.getGroup(child_name);
       // start the recusion
@@ -209,7 +181,7 @@ void exploreSubGroup(HighFive::Group parent_group, std::string relative_path, st
       exploreSubGroup(child_group, new_path, path_list);
     }
   }
-  fragments_count = link_count;
+  if (is_link) {fragments_count = link_count;}
 }
 
 std::vector<std::string> traverseFile(HighFive::File input_file, int num_trs)
@@ -257,31 +229,76 @@ std::vector<std::string> traverseFile(HighFive::File input_file, int num_trs)
 
 int main(int argc, char **argv)
 {
-  int num_trs = 1000;
-  channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
-  /*
-  if(argc <2) {
-    std::cerr << "Usage: data_file_browser <fully qualified file name> [number of events to read]" << std::endl;
-    return -1;
+
+  std::string broker;
+  std::string string_folder;
+  std::string string_interval_of_capture;
+  char *folder;
+  //char *folder = "/eos/home-y/yadonon/TriggerRecords/";
+  //interval_of_capture = 100;
+
+
+
+  bpo::options_description desc{"example: --broker 188.185.122.48:9092 --topic dunedqm-incomingadcfrequency --folder /eos/home-y/yadonon/TriggerRecords/ --interval 100"};
+
+  desc.add_options()
+    ("help,h", "Help screen")
+    ("broker,b", bpo::value<std::string>()->default_value("188.185.122.48:9092"), "Broker")
+    ("topic,t", bpo::value<std::string>()->default_value("dunedqm-incomingadcfrequency"), "Topic")
+    ("folder,f", bpo::value<std::string>()->default_value("/eos/home-y/yadonon/TriggerRecords/"), "Folder")
+    ("interval,i", bpo::value<std::string>()->default_value("100"), "Inverval of capture");
+
+  bpo::variables_map vm;
+    
+  try 
+  {
+    auto parsed = bpo::command_line_parser(argc, argv).options(desc).run();
+    bpo::store(parsed, vm);
+  }
+  catch (bpo::error const& e) 
+  {
+    ers::error(dunedaq::triggertransform::IncorrectParameters(ERS_HERE, e.what()));
   }
 
-  if(argc == 3) {
-    num_trs = std::stoi(argv[2]);
-  }   
-  // Open the existing hdf5 file
-  HighFive::File file(argv[1], HighFive::File::ReadOnly);*/
-  m_host = "188.185.122.48";
-  m_port = "9092";
-  m_topic = "dunedqm-incomingadcfrequency";
+  if (vm.count("help")) {
+    TLOG() << desc << std::endl;
+    return 0;
+  }
+  
+  try 
+  {
+    broker = vm["broker"].as<std::string>();     
+    topic = vm["topic"].as<std::string>();
+    string_folder = vm["folder"].as<std::string>();
+    string_interval_of_capture = vm["interval"].as<std::string>();
+
+    folder = const_cast<char*> (string_folder.c_str());
+    //std::cout << string_interval_of_capture << std::endl;
+    interval_of_capture = stoi(string_interval_of_capture);
+  }
+  catch (bpo::error const& e) 
+  {
+    ers::error(dunedaq::triggertransform::IncorrectParameters(ERS_HERE, e.what()));
+  }
+
+std::cout << topic << std::endl;
+std::cout << broker << std::endl;
+
+  int num_trs = 1000;
+  channelMap.reset(new swtpg::PdspChannelMapService(channel_map_rce, channel_map_felix));
+
+  //m_host = "188.185.122.48";
+  //m_port = "9092";
+  //m_topic = "dunedqm-incomingadcfrequency";
   //Kafka server settings
-  std::string brokers = m_host + ":" + m_port;
+  //std::string brokers = m_host + ":" + m_port;
   std::string errstr;
 
   RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
-  conf->set("bootstrap.servers", brokers, errstr);
+  conf->set("bootstrap.servers", broker, errstr);
   if (errstr != "")
   {
-    dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Bootstrap server error : " + errstr);
+    dunedaq::triggertransform::CannotProduce(ERS_HERE, "Bootstrap server error : " + errstr);
   }
   if (const char *env_p = std::getenv("DUNEDAQ_APPLICATION_NAME"))
     conf->set("client.id", env_p, errstr);
@@ -290,18 +307,92 @@ int main(int argc, char **argv)
 
   if (errstr != "")
   {
-    dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Producer configuration error : " + errstr);
+    dunedaq::triggertransform::CannotProduce(ERS_HERE, "Producer configuration error : " + errstr);
   }
   //Create producer instance
   m_producer = RdKafka::Producer::create(conf, errstr);
 
   if (errstr != "")
   {
-    dunedaq::kafkaraw::CannotProduce(ERS_HERE, "Producer creation error : " + errstr);
+    dunedaq::triggertransform::CannotProduce(ERS_HERE, "Producer creation error : " + errstr);
   }
 
-  HighFive::File file("/eos/home-y/yadonon/swtest_run000002_0000_glehmann_20211001T115720.hdf5", HighFive::File::ReadOnly);
+  DIR *dir; struct dirent *diread;
+  std::vector<std::string> files;
 
-  std::vector<std::string> data_path = traverseFile(file, num_trs);
+
+
+
+  while (true)
+  {
+    try
+    {
+      if ((dir = opendir(folder)) != nullptr) 
+      {
+        while ((diread = readdir(dir)) != nullptr) {
+            files.push_back(folder + std::string(diread->d_name));
+        }
+        closedir (dir);
+      } else 
+      {
+          ers::error(dunedaq::triggertransform::CannotOpenFolder(ERS_HERE, folder));
+      }
+
+      // Read from the text file
+      std::string parsed_file_strings;
+      std::ofstream input_parsed_files("parsedfiles.txt", std::ios::app); 
+      std::ifstream outut_parsed_files("parsedfiles.txt");
+      bool file_parsed = false;
+
+      for (std::string file : files) 
+      {
+        try
+        {
+          if(file.find("hdf5") != std::string::npos )
+          {
+            while (getline (outut_parsed_files, parsed_file_strings))
+            {
+              // Output the text from the file
+              if(parsed_file_strings == file)
+              {
+
+                file_parsed = true;
+                break;
+              }
+              
+            }
+            if(!file_parsed)
+            {
+              /*
+                HighFive::File file("/eos/home-y/yadonon/swtest_run000002_0000_glehmann_20211001T115720.hdf5", HighFive::File::ReadOnly);
+                std::vector<std::string> data_path = traverseFile(file, num_trs);*/
+              std::cout << file << std::endl;
+              HighFive::File h5file(file, HighFive::File::ReadOnly);
+              std::vector<std::string> data_path = traverseFile(h5file, num_trs);
+              input_parsed_files << file << std::endl; 
+              std::cout << file << std::endl; 
+            }
+            else
+            {
+              std::cout << file << " ALLREADY PARSED" << std::endl; 
+            }
+            file_parsed = false;
+          }
+            
+        }
+        catch(const std::exception& e)
+        {
+          dunedaq::triggertransform::ErrorReadingFile(ERS_HERE, e.what());
+        } 
+      }
+      sleep(10); //Wait, then search if files have been added
+      input_parsed_files.close(); 
+      outut_parsed_files.close(); 
+    }
+    catch(const std::exception& e)
+    {
+      dunedaq::triggertransform::CannotOpenFile(ERS_HERE, e.what());
+    }
+  }
   return 0;
 }

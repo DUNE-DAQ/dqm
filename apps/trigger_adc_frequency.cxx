@@ -11,6 +11,7 @@
 #include "dqm/ChannelMapper.hpp"
 #include <stdlib.h>     //for using the function sleep
 #include <dirent.h>
+#include <fstream>
 
 
 namespace dunedaq
@@ -394,7 +395,7 @@ int main(int argc, char **argv)
 
   if ((dir = opendir("/eos/home-y/yadonon/TriggerRecords/")) != nullptr) {
       while ((diread = readdir(dir)) != nullptr) {
-          files.push_back("/eos/home-y/yadonon/TriggerReccords/" + std::string(diread->d_name));
+          files.push_back("/eos/home-y/yadonon/TriggerRecords/" + std::string(diread->d_name));
       }
       closedir (dir);
   } else {
@@ -402,10 +403,42 @@ int main(int argc, char **argv)
       return EXIT_FAILURE;
   }
 
-  for (auto file : files) std::cout << file << std::endl;
-  
-  HighFive::File file("/eos/home-y/yadonon/swtest_run000002_0000_glehmann_20211001T115720.hdf5", HighFive::File::ReadOnly);
+  // Read from the text file
+  std::string parsed_file_strings;
+  std::ofstream input_parsed_files("parsedfiles.txt", std::ios::app); 
+  std::ifstream outut_parsed_files("parsedfiles.txt");
+  bool file_parsed = false;
 
-  std::vector<std::string> data_path = traverseFile(file, num_trs);
+  for (std::string file : files) 
+  {
+    if(file.find("hdf5") != std::string::npos )
+    {
+      while (getline (outut_parsed_files, parsed_file_strings))
+      {
+        // Output the text from the file
+        if(parsed_file_strings == file)
+        {
+          file_parsed = true;
+          break;
+        }
+
+        if(!file_parsed)
+        {
+            /*HighFive::File file("/eos/home-y/yadonon/swtest_run000002_0000_glehmann_20211001T115720.hdf5", HighFive::File::ReadOnly);
+            std::vector<std::string> data_path = traverseFile(file, num_trs);*/
+          std::cout << file << std::endl;
+          HighFive::File h5file(file, HighFive::File::ReadOnly);
+          std::vector<std::string> data_path = traverseFile(h5file, num_trs);
+          input_parsed_files << file << std::endl; 
+        }
+      }
+      file_parsed = false;
+    }
+  }
+  
+  input_parsed_files.close(); 
+  outut_parsed_files.close(); 
+
+
   return 0;
 }
