@@ -52,6 +52,7 @@ const char* readout_share_cstr = getenv("READOUT_SHARE");
 std::string readout_share(readout_share_cstr);
 std::string channel_map_rce = readout_share +  "/config/protoDUNETPCChannelMap_RCE_v4.txt";
 std::string channel_map_felix = readout_share + "/config/protoDUNETPCChannelMap_FELIX_v4.txt";
+std::string data_Source_Name;
 
 void readDataset(std::string path_dataset, void *buff)
 {
@@ -94,7 +95,7 @@ void readDataset(std::string path_dataset, void *buff)
                 << " Total fragments : " << std::to_string(fragments_count) << std::endl;
       for (size_t i = 0; i < raw_data_packets; i += interval_of_capture)
       {
-        message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";" + std::to_string(raw_data_packets) + ";";
+        message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";" + std::to_string(raw_data_packets) + ";" + data_Source_Name + ";";
 
         auto wfptr_i = reinterpret_cast<dunedaq::dataformats::WIBFrame *>(frag.get_data() + i * sizeof(dunedaq::dataformats::WIBFrame));
 
@@ -233,17 +234,19 @@ int main(int argc, char **argv)
   std::string broker;
   std::string string_folder;
   std::string string_interval_of_capture;
+
   char *folder;
   //char *folder = "/eos/home-y/yadonon/TriggerRecords/";
   //interval_of_capture = 100;
 
 
 
-  bpo::options_description desc{"example: --broker 188.185.122.48:9092 --topic dunedqm-incomingadcfrequency --folder /eos/home-y/yadonon/TriggerRecords/ --interval 100"};
+  bpo::options_description desc{"example: --broker 188.185.122.48:9092 --Source defaultSource --topic dunedqm-incomingadcfrequency --folder /eos/home-y/yadonon/TriggerRecords/ --interval 100"};
 
   desc.add_options()
     ("help,h", "Help screen")
     ("broker,b", bpo::value<std::string>()->default_value("188.185.122.48:9092"), "Broker")
+    ("source,s", bpo::value<std::string>()->default_value("defaultSource"), "Source")
     ("topic,t", bpo::value<std::string>()->default_value("dunedqm-incomingadcfrequency"), "Topic")
     ("folder,f", bpo::value<std::string>()->default_value("/eos/home-y/yadonon/TriggerRecords/"), "Folder")
     ("interval,i", bpo::value<std::string>()->default_value("100"), "Inverval of capture");
@@ -271,9 +274,8 @@ int main(int argc, char **argv)
     topic = vm["topic"].as<std::string>();
     string_folder = vm["folder"].as<std::string>();
     string_interval_of_capture = vm["interval"].as<std::string>();
-
+    data_Source_Name = vm["source"].as<std::string>();
     folder = const_cast<char*> (string_folder.c_str());
-    //std::cout << string_interval_of_capture << std::endl;
     interval_of_capture = stoi(string_interval_of_capture);
   }
   catch (bpo::error const& e) 
