@@ -185,8 +185,8 @@ FourierSum::transmit(std::string &kafka_address, std::unique_ptr<ChannelMap> &cm
   int event = 0;
   std::string partition = getenv("DUNEDAQ_PARTITION");
   std::string app_name = getenv("DUNEDAQ_APPLICATION_NAME");
-  //std::string datasource = partition + "_" + app_name;
-  std::string datasource = "fftsum_test";
+  std::string datasource = partition + "_" + app_name;
+  //std::string datasource = "fftsum_test";
 
 
   auto freq = fouriervec[0].get_frequencies();

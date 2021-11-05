@@ -72,6 +72,7 @@ private:
   dqmprocessor::StandardDQM m_standard_dqm_hist;
   dqmprocessor::StandardDQM m_standard_dqm_mean_rms;
   dqmprocessor::StandardDQM m_standard_dqm_fourier;
+  dqmprocessor::StandardDQM m_standard_dqm_fourier_sum;
 
   using timesync_source_qt = appfwk::DAQSource<dfmessages::TimeSync>;
   std::unique_ptr<timesync_source_qt> m_timesync_source;
