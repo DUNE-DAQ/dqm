@@ -66,8 +66,8 @@ void readDataset(std::string path_dataset, void *buff)
     {
 
       // Get pointer to the first WIB frame
-      //auto wfptr = reinterpret_cast<dunedaq::detdataformats::WIBFrame *>(frag.get_data());
-      size_t raw_data_packets = (frag.get_size() - sizeof(dunedaq::daqdataformats::FragmentHeader)) / sizeof(dunedaq::detdataformats::WIBFrame);
+      //auto wfptr = reinterpret_cast<dunedaq::detdataformats::wib::WIBFrame *>(frag.get_data());
+      size_t raw_data_packets = (frag.get_size() - sizeof(dunedaq::daqdataformats::FragmentHeader)) / sizeof(dunedaq::detdataformats::wib::WIBFrame);
 
       //Message to be sent by kafka
       //Sends first informations about the trigger record and then about the WIB frame sent
@@ -78,10 +78,10 @@ void readDataset(std::string path_dataset, void *buff)
         message_to_kafka = std::to_string(apa_count) + ";" + std::to_string(fragments_count) + ";" + std::to_string(interval_of_capture) + ";" + std::to_string(frag.get_run_number()) + ";" + std::to_string(frag.get_trigger_number()) + ";" + std::to_string(frag.get_element_id().region_id) + ";" + std::to_string(frag.get_element_id().element_id) + ";" + std::to_string(raw_data_packets) + ";" + data_Source_Name + ";";
 
 
-        auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::WIBFrame *>(static_cast<char*>(frag.get_data()) + i * sizeof(dunedaq::detdataformats::WIBFrame));
-        //auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::WIBFrame *>(i * sizeof(dunedaq::detdataformats::WIBFrame));
+        auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::wib::WIBFrame *>(static_cast<char*>(frag.get_data()) + i * sizeof(dunedaq::detdataformats::wib::WIBFrame));
+        //auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::wib::WIBFrame *>(i * sizeof(dunedaq::detdataformats::wib::WIBFrame));
 
-        //auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::WIBFrame*>(frag.get_data());       
+        //auto wfptr_i = reinterpret_cast<dunedaq::detdataformats::wib::WIBFrame*>(frag.get_data());       
 
         //Adds wib frame id
         message_to_kafka += std::to_string(i/interval_of_capture) + "\n";

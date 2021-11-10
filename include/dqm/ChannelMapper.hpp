@@ -29,7 +29,7 @@ namespace dunedaq::dqm
 {
 
 unsigned int getOfflineChannel(swtpg::PdspChannelMapService& channelMap, 
-                               const dunedaq::detdataformats::WIBFrame* frame,
+                               const dunedaq::detdataformats::wib::WIBFrame* frame,
                                unsigned int ch) // NOLINT(build/unsigned)
 {
   // handle 256 channels on two fibers -- use the channel

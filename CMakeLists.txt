@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(dqm VERSION 1.1.3)
+project(dqm VERSION 1.1.6)
 
 find_package(daq-cmake REQUIRED)
 
@@ -27,6 +27,7 @@ daq_codegen(*info.jsonnet DEP_PKGS opmonlib TEMPLATES opmonlib/InfoStructs.hpp.j
 # We put here the name of our class, and the libraries we want to link with
 
 daq_add_plugin(DQMProcessor duneDAQModule LINK_LIBRARIES appfwk::appfwk daqdataformats::daqdataformats detdataformats::detdataformats detchannelmaps::detchannelmaps readout::readout timinglibs::timinglibs RdKafka::rdkafka RdKafka::rdkafka++)
+# daq_add_plugin(HDF5Reader duneDAQModule LINK_LIBRARIES appfwk::appfwk daqdataformats::daqdataformats detdataformats::detdataformats detchannelmaps::detchannelmaps timinglibs::timinglibs readout::readout HighFive)
 
 # Unit tests
 

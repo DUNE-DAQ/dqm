@@ -28,24 +28,24 @@ public:
    * @return A map whose keys are the GeoID indexes and the values are
    *         vectors of pointers to the wibframes
    */
-  std::map<int, std::vector<detdataformats::WIBFrame*>> decode(dunedaq::daqdataformats::TriggerRecord& record);
+  std::map<int, std::vector<detdataformats::wib::WIBFrame*>> decode(dunedaq::daqdataformats::TriggerRecord& record);
 };
 
-std::map<int, std::vector<detdataformats::WIBFrame*>>
+std::map<int, std::vector<detdataformats::wib::WIBFrame*>>
 decodewib(daqdataformats::TriggerRecord& record)
 {
   std::vector<std::unique_ptr<daqdataformats::Fragment>>& fragments = record.get_fragments_ref();
 
-  std::map<int, std::vector<detdataformats::WIBFrame*>> wibframes;
+  std::map<int, std::vector<detdataformats::wib::WIBFrame*>> wibframes;
 
   for (auto& fragment : fragments) {
     auto id = fragment->get_element_id();
     auto element_id = id.element_id;
-    int num_chunks = (fragment->get_size() - sizeof(daqdataformats::FragmentHeader)) / sizeof(detdataformats::WIBFrame);
-    std::vector<detdataformats::WIBFrame*> tmp;
+    int num_chunks = (fragment->get_size() - sizeof(daqdataformats::FragmentHeader)) / sizeof(detdataformats::wib::WIBFrame);
+    std::vector<detdataformats::wib::WIBFrame*> tmp;
     for (int i = 0; i < num_chunks; ++i) {
-      detdataformats::WIBFrame* frame =
-        reinterpret_cast<detdataformats::WIBFrame*>(static_cast<char*>(fragment->get_data()) + (i * 464)); // NOLINT
+      detdataformats::wib::WIBFrame* frame =
+        reinterpret_cast<detdataformats::wib::WIBFrame*>(static_cast<char*>(fragment->get_data()) + (i * 464)); // NOLINT
       tmp.push_back(frame);
     }
     wibframes[element_id] = tmp;
@@ -54,7 +54,7 @@ decodewib(daqdataformats::TriggerRecord& record)
   return wibframes;
 }
 
-std::map<int, std::vector<detdataformats::WIBFrame*>>
+std::map<int, std::vector<detdataformats::wib::WIBFrame*>>
 Decoder::decode(daqdataformats::TriggerRecord& record)
 {
   return decodewib(record);

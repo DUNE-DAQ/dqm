@@ -98,6 +98,11 @@ ChannelMapVD::fill(daqdataformats::TriggerRecord &tr)
   if (m_map.find(-1) != m_map.end()) {
     m_map.erase(-1);
   }
+  // Add this entry because it's the value of the plane for the disconnected
+  // channels
+  if (m_map.find(9999) != m_map.end()) {
+    m_map.erase(9999);
+  }
 
   TLOG_DEBUG(5) << "Channel Map for the VD created";
   m_is_filled = true;
