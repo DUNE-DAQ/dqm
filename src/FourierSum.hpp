@@ -223,6 +223,13 @@ FourierSum::clean()
   for (size_t ich = 0; ich < m_size; ++ich) {
     fouriervec[ich].clean();
   }
+  //TLOG() << "Starting the clean" << std::endl;
+  for (size_t i_pl = 0; i_pl < 4; ++i_pl)
+  {
+    //TLOG() << "Cleaning fourier sum entry " << i_pl << std::endl;
+    fouriersum[i_pl].clean();
+  }
+ 
 }
 
 void
