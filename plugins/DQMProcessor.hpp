@@ -49,6 +49,8 @@ public:
 
   void do_print(const data_t&);
   void do_start(const data_t&);
+  void do_pause(const data_t&);
+  void do_resume(const data_t&);
   void do_stop(const data_t&);
   void do_configure(const data_t&);
 
@@ -87,6 +89,9 @@ private:
   int m_clock_frequency;
 
   std::unique_ptr<std::thread> m_running_thread;
+
+  // paused state, in which we don't send triggers
+  std::atomic<bool> m_paused;
 
   std::atomic<int> m_request_count{0};
   std::atomic<int> m_total_request_count{0};

@@ -44,6 +44,8 @@ DQMProcessor::DQMProcessor(const std::string& name)
 {
   register_command("start", &DQMProcessor::do_start);
   register_command("conf", &DQMProcessor::do_configure);
+  register_command("pause", &DQMProcessor::do_pause);
+  register_command("resume", &DQMProcessor::do_resume);
   register_command("stop", &DQMProcessor::do_stop);
 }
 
@@ -91,6 +93,7 @@ DQMProcessor::do_start(const nlohmann::json& args)
 {
   m_time_est.reset(new timinglibs::TimestampEstimator(m_timesync_source, m_clock_frequency));
 
+  m_paused.store(true);
   m_run_marker.store(true);
 
   m_run_number.store(daqdataformats::run_number_t(
@@ -102,6 +105,18 @@ DQMProcessor::do_start(const nlohmann::json& args)
   m_map.reset(new ChannelMapEmpty);
 
   m_running_thread.reset(new std::thread(&DQMProcessor::RequestMaker, this));
+}
+
+void
+DQMProcessor::do_pause(const nlohmann::json& /*pauseobj*/)
+{
+  m_paused.store(true);
+}
+
+void
+DQMProcessor::do_resume(const nlohmann::json& /*resumeobj*/)
+{
+  m_paused.store(false);
 }
 
 void
@@ -231,6 +246,11 @@ DQMProcessor::RequestMaker()
       ers::warning(InvalidTimestamp(ERS_HERE, timestamp));
       // Some sleep is needed because at the beginning there are no valid timestamps
       // so it will be checking continuously if there is a valid one
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
+      continue;
+    }
+
+    if (m_paused.load()) {
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
       continue;
     }
