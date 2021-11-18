@@ -5,8 +5,8 @@
  * Licensing/copyright details are in the COPYING file that you should have
  * received with this code.
  */
-#ifndef DQM_INCLUDE_DQM_HIST_HPP_
-#define DQM_INCLUDE_DQM_HIST_HPP_
+#ifndef DQM_SRC_HIST_HPP_
+#define DQM_SRC_HIST_HPP_
 
 // DQM
 #include "AnalysisModule.hpp"
@@ -16,7 +16,6 @@
 #include "daqdataformats/TriggerRecord.hpp"
 
 #include <chrono>
-#include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
@@ -24,6 +23,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 /**
  * Basic 1D histogram that counts entries
@@ -77,6 +77,7 @@ public:
 
   double mean();
   double std();
+
 };
 
 Hist::Hist(int steps, double low, double high)
@@ -160,8 +161,7 @@ Hist::clean()
 double
 Hist::mean()
 {
-  if (m_mean_set)
-    return m_mean;
+  if (m_mean_set) return m_mean;
   m_mean = m_sum / m_nentries;
   m_mean_set = true;
   return m_mean;
@@ -170,14 +170,13 @@ Hist::mean()
 double
 Hist::std()
 {
-  if (m_std_set)
-    return m_std;
+  if (m_std_set) return m_std;
   m_mean = mean();
-  m_std = sqrt((m_sum_sq + m_nentries * m_mean * m_mean - 2 * m_sum * m_mean) / (m_nentries - 1));
+  m_std = sqrt( (m_sum_sq + m_nentries * m_mean * m_mean - 2 * m_sum * m_mean) / (m_nentries - 1) );
   m_std_set = true;
   return m_std;
 }
 
 } // namespace dunedaq::dqm
 
-#endif // DQM_INCLUDE_DQM_HIST_HPP_
+#endif // DQM_SRC_HIST_HPP_

@@ -8,31 +8,43 @@
 #ifndef DQM_INCLUDE_DQM_DQMISSUES_HPP_
 #define DQM_INCLUDE_DQM_DQMISSUES_HPP_
 
-#include "dfmessages/Types.hpp"
-
 #include <ers/Issue.hpp>
 
 #include <string>
 
+#include "dfmessages/Types.hpp"
+
 namespace dunedaq {
 
-ERS_DECLARE_ISSUE(dqm, ChannelMapError, "Channel Map parameter not valid:" << error, ((std::string)error))
+ERS_DECLARE_ISSUE(dqm,
+                  ChannelMapError,
+                  "Channel Map parameter not valid:" << error,
+                  ((std::string)error))
 
 ERS_DECLARE_ISSUE(dqm,
                   InvalidEnvVariable,
                   "Trying to get the env variable " << env << " did not work",
                   ((std::string)env))
 
-ERS_DECLARE_ISSUE(dqm, CouldNotOpenFile, "Unable to open the file " << file, ((std::string)file))
+ERS_DECLARE_ISSUE(dqm,
+                  CouldNotOpenFile,
+                  "Unable to open the file " << file,
+                  ((std::string)file))
 
 ERS_DECLARE_ISSUE(dqm,
                   InvalidTimestamp,
                   "The timestamp " << timestamp << " is not valid",
                   ((dfmessages::timestamp_t)timestamp))
 
-ERS_DECLARE_ISSUE(dqm, ProcessorError, "Error in DQMProcessor: " << error, ((std::string)error))
+ERS_DECLARE_ISSUE(dqm,
+                  ProcessorError,
+                  "Error in DQMProcessor: ",
+                  ((std::string)error))
 
-ERS_DECLARE_ISSUE(dqm, InvalidData, "Data was not valid: " << error, ((std::string)error))
+ERS_DECLARE_ISSUE(dqm,
+                  InvalidData,
+                  "Data was not valid: ",
+                  ((std::string)error))
 
 } // namespace dunedaq
 

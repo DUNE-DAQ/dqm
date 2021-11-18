@@ -11,56 +11,57 @@
 #include <librdkafka/rdkafkacpp.h>
 #include <string>
 
-namespace dunedaq::dqm {
+namespace dunedaq::dqm
+{
 
 class KafkaStream
 {
-public:
-  explicit KafkaStream(const std::string& param);
-  void kafka_exporter(std::string input, std::string topic);
-  RdKafka::Producer* m_producer;
+  public:
+    KafkaStream(const std::string & param);
+    void kafka_exporter(std::string input, std::string topic);
+    RdKafka::Producer *m_producer;
 };
 
-KafkaStream::KafkaStream(const std::string& param)
+KafkaStream::KafkaStream(const std::string &param)
 {
-  // Kafka server settings
+  //Kafka server settings
   std::string brokers = param;
   std::string errstr;
 
-  RdKafka::Conf* conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
+  RdKafka::Conf *conf = RdKafka::Conf::create(RdKafka::Conf::CONF_GLOBAL);
   conf->set("bootstrap.servers", brokers, errstr);
   conf->set("client.id", "dqm", errstr);
   // conf->set("message.max.bytes", "1000000000", errstr);
-  // Create producer instance
+  //Create producer instance
   m_producer = RdKafka::Producer::create(conf, errstr);
 }
 
-void
-KafkaStream::kafka_exporter(std::string input, std::string topic)
+void KafkaStream::kafka_exporter(std::string input, std::string topic)
 {
-  RdKafka::ErrorCode err = m_producer->produce(topic,
-                                               RdKafka::Topic::PARTITION_UA,
-                                               RdKafka::Producer::RK_MSG_COPY,
-                                               const_cast<char*>(input.c_str()),
-                                               input.size(),
-                                               nullptr,
-                                               0,
-                                               0,
-                                               nullptr,
-                                               nullptr);
+  RdKafka::ErrorCode err = m_producer->produce(
+                      topic,
+                      RdKafka::Topic::PARTITION_UA,
+                      RdKafka::Producer::RK_MSG_COPY,
+                      const_cast<char *>(input.c_str()), input.size(),
+                      nullptr,
+                      0,
+                      0,
+                      nullptr,
+                      nullptr);
 
   if (err != RdKafka::ERR_NO_ERROR) {
-    TLOG() << "% Failed to produce to topic " << topic << ": " << RdKafka::err2str(err);
+     TLOG()<< "% Failed to produce to topic " << topic << ": " <<
+           RdKafka::err2str(err);
   }
 }
 
 void
-KafkaExport(std::string& kafka_address, std::string input, std::string topic)
+KafkaExport(std::string &kafka_address, std::string input, std::string topic)
 {
   static dqm::KafkaStream stream(kafka_address);
   stream.kafka_exporter(input, topic);
 }
 
-} // namespace dunedaq::dqm
+} //namespace dqm
 
 #endif // DQM_SRC_EXPORTER_HPP_
