@@ -120,7 +120,6 @@ DQMProcessor::RequestMaker()
   {
     std::shared_ptr<AnalysisModule> mod;
     double between_time;
-    double default_unavailable_time;
     int number_of_frames;
     std::shared_ptr<std::thread> running_thread;
     std::string name;
@@ -163,7 +162,6 @@ DQMProcessor::RequestMaker()
     map[std::chrono::system_clock::now() + std::chrono::seconds(10)] = {
       hist,
       m_standard_dqm_hist.how_often,
-      m_standard_dqm_hist.unavailable_time,
       m_standard_dqm_hist.num_frames,
       nullptr,
       "Histogram every " + std::to_string(m_standard_dqm_hist.how_often) + " s"
@@ -172,7 +170,6 @@ DQMProcessor::RequestMaker()
     map[std::chrono::system_clock::now() + std::chrono::seconds(10)] = {
       mean_rms,
       m_standard_dqm_mean_rms.how_often,
-      m_standard_dqm_mean_rms.unavailable_time,
       m_standard_dqm_mean_rms.num_frames,
       nullptr,
       "Mean and RMS every " + std::to_string(m_standard_dqm_mean_rms.how_often) + " s"
@@ -181,7 +178,6 @@ DQMProcessor::RequestMaker()
     map[std::chrono::system_clock::now() + std::chrono::seconds(10)] = {
       fourier,
       m_standard_dqm_fourier.how_often,
-      m_standard_dqm_fourier.unavailable_time,
       m_standard_dqm_fourier.num_frames,
       nullptr,
       "Fourier every " + std::to_string(m_standard_dqm_fourier.how_often) + " s"
@@ -230,11 +226,11 @@ DQMProcessor::RequestMaker()
     // otherwise we wait for more time
     if (algo->get_is_running()) {
       TLOG(5) << "ALGORITHM " << analysis_instance.name << " already running";
+      // * 100 is a 10% of the time specified in how_often since it is in milliseconds
       map[std::chrono::system_clock::now() +
-          std::chrono::milliseconds(static_cast<int>(analysis_instance.default_unavailable_time) * 1000)] = {
+          std::chrono::milliseconds(static_cast<int>(analysis_instance.how_often) * 100)] = {
         algo,
         analysis_instance.between_time,
-        analysis_instance.default_unavailable_time,
         analysis_instance.number_of_frames,
         previous_thread,
         analysis_instance.name
@@ -293,7 +289,6 @@ DQMProcessor::RequestMaker()
         std::chrono::milliseconds(static_cast<int>(analysis_instance.between_time) * 1000)] = {
       algo,
       analysis_instance.between_time,
-      analysis_instance.default_unavailable_time,
       analysis_instance.number_of_frames,
       current_thread,
       analysis_instance.name
