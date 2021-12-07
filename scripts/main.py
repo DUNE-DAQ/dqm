@@ -36,26 +36,6 @@ np04 = {'location' : '/data0',
 
 dic = {}
 dic2 = {}
-# def channel_map():
-
-#     ls = [x.split() for x in open('channel_mapvd.txt').read().split('\n') if x]
-#     for line in ls:
-#         dic[(int(line[1]), int(line[2]), int(line[3]))] = int(line[0])
-#         dic2[int(line[0])] = 'UYZ'.find(line[-1][0])
-
-# channel_map()
-
-# def get_offline_channel(slot, fiber, chan):
-#     wc = fiber*2 - 1
-#     if (chan>127):
-#       chan -= 128
-#       wc += 1
-#     wib, wibconnector, cechan = slot + 1, wc, chan
-#     return dic[wib, wibconnector, cechan]
-
-
-dic = {}
-dic2 = {}
 def channel_map():
     ls = [x.split() for x in open('protoDUNETPCChannelMap_FELIX_v4.txt').read().split('\n') if x]
     for line in ls:
