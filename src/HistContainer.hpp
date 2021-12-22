@@ -10,44 +10,63 @@
 
 // DQM
 #include "AnalysisModule.hpp"
-#include "Decoder.hpp"
-#include "Exporter.hpp"
 #include "ChannelMap.hpp"
 #include "Constants.hpp"
-#include "dqm/Hist.hpp"
+#include "Decoder.hpp"
+#include "Exporter.hpp"
 #include "dqm/DQMIssues.hpp"
+#include "dqm/Hist.hpp"
 
 #include "daqdataformats/TriggerRecord.hpp"
 
+#include <cstdlib>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
-#include <cstdlib>
 
 namespace dunedaq::dqm {
 
-
 class HistContainer : public AnalysisModule
 {
+
+public:
+  HistContainer(std::string name, int nhist, int steps, double low, double high, bool only_mean = false);
+  HistContainer(std::string name,
+                int nhist,
+                std::vector<int>& link_idx,
+                int steps,
+                double low,
+                double high,
+                bool only_mean);
+
+  void run(std::unique_ptr<daqdataformats::TriggerRecord> record,
+           std::atomic<bool>& run_mark,
+           std::unique_ptr<ChannelMap>& map,
+           std::string kafka_address = "");
+  void transmit(std::string& kafka_address,
+                std::unique_ptr<ChannelMap>& map,
+                const std::string& topicname,
+                int run_num,
+                time_t timestamp);
+  void transmit_mean_and_rms(std::string& kafka_address,
+                             std::unique_ptr<ChannelMap>& map,
+                             const std::string& topicname,
+                             int run_num,
+                             time_t timestamp);
+  void clean();
+  void append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap>& map); // NOLINT(build/unsigned)
+  void fill(int ch, double value);
+  void fill(int ch, int link, double value);
+  int get_local_index(int ch, int link);
+
+private:
   std::string m_name;
   std::vector<Hist> histvec;
   int m_size;
   std::map<int, std::string> m_to_send;
   std::map<int, int> m_index;
   bool m_only_mean_rms = false;
-
-public:
-  HistContainer(std::string name, int nhist, int steps, double low, double high, bool only_mean=false);
-  HistContainer(std::string name, int nhist, std::vector<int>& link_idx, int steps, double low, double high, bool only_mean);
-
-  void run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::unique_ptr<ChannelMap> &map, std::string kafka_address="");
-  void transmit(std::string &kafka_address, std::unique_ptr<ChannelMap> &map, const std::string& topicname, int run_num, time_t timestamp);
-  void transmit_mean_and_rms(std::string &kafka_address, std::unique_ptr<ChannelMap> &map, const std::string& topicname, int run_num, time_t timestamp);
-  void clean();
-  void append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap> &map);
-  void fill(int ch, double value);
-  void fill(int ch, int link, double value);
-  int get_local_index(int ch, int link);
-
 };
 
 HistContainer::HistContainer(std::string name, int nhist, int steps, double low, double high, bool only_mean)
@@ -59,7 +78,13 @@ HistContainer::HistContainer(std::string name, int nhist, int steps, double low,
     histvec.emplace_back(Hist(steps, low, high));
 }
 
-HistContainer::HistContainer(std::string name, int nhist, std::vector<int>& link_idx, int steps, double low, double high, bool only_mean)
+HistContainer::HistContainer(std::string name,
+                             int nhist,
+                             std::vector<int>& link_idx,
+                             int steps,
+                             double low,
+                             double high,
+                             bool only_mean)
   : m_name(name)
   , m_size(nhist)
   , m_only_mean_rms(only_mean)
@@ -75,15 +100,18 @@ HistContainer::HistContainer(std::string name, int nhist, std::vector<int>& link
 }
 
 void
-HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::unique_ptr<ChannelMap> &map, std::string kafka_address)
+HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
+                   std::atomic<bool>&,
+                   std::unique_ptr<ChannelMap>& map,
+                   std::string kafka_address)
 {
-  m_run_mark.store(true);
+  set_is_running(true);
   dunedaq::dqm::Decoder dec;
   auto wibframes = dec.decode(*record);
 
   if (wibframes.size() == 0) {
     // throw issue
-    m_run_mark.store(false);
+    set_is_running(false);
     TLOG() << "Found no frames";
     return;
   }
@@ -94,7 +122,7 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::u
     keys.push_back(key);
   }
 
-  uint64_t min_timestamp = 0;
+  uint64_t min_timestamp = 0; // NOLINT(build/unsigned)
   // We run over all links until we find one that has a non-empty vector of frames
   for (auto& key : keys) {
     if (!wibframes[key].empty()) {
@@ -102,14 +130,15 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::u
       break;
     }
   }
-  uint64_t timestamp = 0;
+  uint64_t timestamp = 0; // NOLINT(build/unsigned)
 
   // Check that all the wibframes vectors have the same size, if not, something
-  // bad has happened
+  // bad has happened, for now don't do anything
   auto size = wibframes.begin()->second.size();
   for (auto& vec : wibframes) {
     if (vec.second.size() != size) {
       ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
+      set_is_running(false);
       return;
     }
   }
@@ -142,19 +171,25 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::u
     }
   }
   if (m_only_mean_rms) {
-    transmit_mean_and_rms(kafka_address, map, "testdunedqm", record->get_header_ref().get_run_number(), record->get_header_ref().get_trigger_timestamp());
-  }
-  else {
-    transmit(kafka_address, map, "testdunedqm", record->get_header_ref().get_run_number(), record->get_header_ref().get_trigger_timestamp());
+    transmit_mean_and_rms(kafka_address,
+                          map,
+                          "testdunedqm",
+                          record->get_header_ref().get_run_number(),
+                          record->get_header_ref().get_trigger_timestamp());
+  } else {
+    transmit(kafka_address,
+             map,
+             "testdunedqm",
+             record->get_header_ref().get_run_number(),
+             record->get_header_ref().get_trigger_timestamp());
   }
   clean();
 
-  m_run_mark.store(false);
-
+  set_is_running(false);
 }
 
 void
-HistContainer::append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap> &cmap)
+HistContainer::append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap>& cmap) // NOLINT(build/unsigned)
 {
   auto channel_order = cmap->get_map();
   for (auto& [plane, map] : channel_order) {
@@ -169,7 +204,11 @@ HistContainer::append_to_string(std::uint64_t timestamp, std::unique_ptr<Channel
 }
 
 void
-HistContainer::transmit(std::string& kafka_address, std::unique_ptr<ChannelMap> &cmap, const std::string& topicname, int run_num, time_t timestamp)
+HistContainer::transmit(std::string& kafka_address,
+                        std::unique_ptr<ChannelMap>& cmap,
+                        const std::string& topicname,
+                        int run_num,
+                        time_t timestamp)
 {
   // Placeholders
   std::string dataname = m_name;
@@ -184,9 +223,8 @@ HistContainer::transmit(std::string& kafka_address, std::unique_ptr<ChannelMap> 
 
   for (auto& [key, value] : channel_order) {
     std::stringstream output;
-    output << datasource << ";" << dataname << ";" << run_num << ";" << subrun
-           << ";" << event << ";" << timestamp << ";" << metadata << ";"
-           << partition << ";" << app_name << ";" << 0 << ";" << key << ";";
+    output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp
+           << ";" << metadata << ";" << partition << ";" << app_name << ";" << 0 << ";" << key << ";";
     for (auto& [offch, ch] : value) {
       output << offch << " ";
     }
@@ -196,11 +234,14 @@ HistContainer::transmit(std::string& kafka_address, std::unique_ptr<ChannelMap> 
     KafkaExport(kafka_address, output.str(), topicname);
   }
   m_to_send.clear();
-
 }
 
 void
-HistContainer::transmit_mean_and_rms(std::string& kafka_address, std::unique_ptr<ChannelMap> &cmap, const std::string& topicname, int run_num, time_t timestamp)
+HistContainer::transmit_mean_and_rms(std::string& kafka_address,
+                                     std::unique_ptr<ChannelMap>& cmap,
+                                     const std::string& topicname,
+                                     int run_num,
+                                     time_t timestamp)
 {
   // Placeholders
   std::string dataname = m_name;
@@ -217,9 +258,8 @@ HistContainer::transmit_mean_and_rms(std::string& kafka_address, std::unique_ptr
   auto channel_order = cmap->get_map();
   for (auto& [plane, map] : channel_order) {
     std::stringstream output;
-    output << datasource << ";" << dataname << ";" << run_num << ";" << subrun
-           << ";" << event << ";" << timestamp << ";" << metadata << ";"
-           << partition << ";" << app_name << ";" << 0 << ";" << plane << ";";
+    output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp
+           << ";" << metadata << ";" << partition << ";" << app_name << ";" << 0 << ";" << plane << ";";
     for (auto& [offch, pair] : map) {
       output << offch << " ";
     }
@@ -241,7 +281,6 @@ HistContainer::transmit_mean_and_rms(std::string& kafka_address, std::unique_ptr
     TLOG_DEBUG(5) << "Size of the message in bytes: " << output.str().size();
     KafkaExport(kafka_address, output.str(), topicname);
   }
-
 }
 
 void
@@ -269,7 +308,6 @@ HistContainer::get_local_index(int ch, int link)
 {
   return ch + m_index[link];
 }
-
 
 } // namespace dunedaq::dqm
 

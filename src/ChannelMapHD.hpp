@@ -10,19 +10,24 @@
 
 // DQM
 #include "ChannelMap.hpp"
-#include "Decoder.hpp"
 #include "Constants.hpp"
+#include "Decoder.hpp"
 #include "dqm/DQMIssues.hpp"
 
 #include "daqdataformats/TriggerRecord.hpp"
 #include "detchannelmaps/TPCChannelMap.hpp"
+#include "logging/Logging.hpp"
 
-#include <stdlib.h>
+#include <cstdlib>
+#include <map>
 #include <set>
+#include <tuple>
+#include <utility>
 
 namespace dunedaq::dqm {
 
-class ChannelMapHD : public ChannelMap {
+class ChannelMapHD : public ChannelMap
+{
   std::map<int, std::map<int, std::pair<int, int>>> m_map;
 
 public:
@@ -30,7 +35,7 @@ public:
   int get_channel(int channel);
   int get_plane(int channel);
   bool is_filled();
-  void fill(daqdataformats::TriggerRecord &tr);
+  void fill(daqdataformats::TriggerRecord& tr);
   std::map<int, std::map<int, std::pair<int, int>>> get_map();
 };
 
@@ -46,7 +51,7 @@ ChannelMapHD::get_map()
 }
 
 void
-ChannelMapHD::fill(daqdataformats::TriggerRecord &tr)
+ChannelMapHD::fill(daqdataformats::TriggerRecord& tr)
 {
   if (is_filled()) {
     TLOG_DEBUG(5) << "ChannelMapHD already filled";
@@ -68,25 +73,24 @@ ChannelMapHD::fill(daqdataformats::TriggerRecord &tr)
       int crate = fr->get_wib_header()->crate_no;
       int slot = fr->get_wib_header()->slot_no;
       int fiber = fr->get_wib_header()->fiber_no;
-      auto tmp = std::make_tuple<int, int, int>((int)crate, (int)slot, (int)fiber);
+      auto tmp = std::make_tuple(crate, slot, fiber);
       if (frame_numbers.find(tmp) == frame_numbers.end()) {
         frame_numbers.insert(tmp);
-      }
-      else {
+      } else {
         continue;
       }
-      for (int ich=0; ich < CHANNELS_PER_LINK; ++ich) {
+      for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
         auto channel = m_chmap_service->get_offline_channel_from_crate_slot_fiber_chan(crate, slot, fiber, ich);
         auto plane = m_chmap_service->get_plane_from_offline_channel(channel);
-        m_map[plane][channel] = {key, ich};
+        m_map[plane][channel] = { key, ich };
       }
     }
   }
-  TLOG_DEBUG(10) << "Channel mapping done, size of the map is " << m_map[0].size() << " " << m_map[1].size() << " " << m_map[2].size();
+  TLOG_DEBUG(10) << "Channel mapping done, size of the map is " << m_map[0].size() << " " << m_map[1].size() << " "
+                 << m_map[2].size();
 
   TLOG_DEBUG(5) << "Channel Map for the HD created";
   m_is_filled = true;
-
 }
 
 bool

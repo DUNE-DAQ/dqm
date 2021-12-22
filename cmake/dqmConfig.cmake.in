@@ -7,9 +7,18 @@ include(CMakeFindDependencyMacro)
 # find_package calls in your package's CMakeLists.txt file
 
 find_dependency(ers)
-find_dependency(Boost COMPONENTS unit_test_framework program_options)
-find_dependency(TRACE)
+find_dependency(Boost COMPONENTS program_options)
 find_dependency(RdKafka)
+find_dependency(appfwk)
+find_dependency(opmonlib)
+find_dependency(readoutlibs)
+find_dependency(daqdataformats)
+find_dependency(detdataformats)
+find_dependency(detchannelmaps)
+find_dependency(timinglibs)
+find_dependency(HighFive)
+
+
 
 # Figure out whether or not this dependency is an installed package or
 # in repo form

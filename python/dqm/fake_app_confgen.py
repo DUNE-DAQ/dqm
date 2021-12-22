@@ -11,8 +11,8 @@ moo.otypes.load_types('appfwk/cmd.jsonnet')
 moo.otypes.load_types('appfwk/app.jsonnet')
 
 moo.otypes.load_types('dfmodules/triggerrecordbuilder.jsonnet')
-moo.otypes.load_types('readout/readoutconfig.jsonnet')
-moo.otypes.load_types('readout/sourceemulatorconfig.jsonnet')
+moo.otypes.load_types('readoutlibs/readoutconfig.jsonnet')
+moo.otypes.load_types('readoutlibs/sourceemulatorconfig.jsonnet')
 
 moo.otypes.load_types('dqm/dqmprocessor.jsonnet')
 
@@ -22,8 +22,8 @@ import dunedaq.rcif.cmd as rccmd # AddressedCmd,
 import dunedaq.appfwk.cmd as cmd # AddressedCmd, 
 import dunedaq.appfwk.app as app # AddressedCmd, 
 import dunedaq.dfmodules.triggerrecordbuilder as trb
-import dunedaq.readout.readoutconfig as rconf
-import dunedaq.readout.sourceemulatorconfig as sec
+import dunedaq.readoutlibs.readoutconfig as rconf
+import dunedaq.readoutlibs.sourceemulatorconfig as sec
 import dunedaq.dqm.dqmprocessor as dqmprocessor
 
 from appfwk.utils import mcmd, mrccmd, mspec
@@ -171,6 +171,7 @@ def generate(
                         sdqm_hist=dqmprocessor.StandardDQM(how_often=60, unavailable_time=10, num_frames=50),
                         sdqm_mean_rms=dqmprocessor.StandardDQM(how_often=10, unavailable_time=1, num_frames=100),
                         sdqm_fourier=dqmprocessor.StandardDQM(how_often=60 * 20, unavailable_time=60, num_frames=100),
+                        sdqm_fourier_sum=dqmprocessor.StandardDQM(how_often=60 * 5, unavailable_time=1,num_frames=8192),
                         kafka_address='dqmbroadcast:9092',
                         link_idx=list(range(NUMBER_OF_DATA_PRODUCERS)),
                         clock_frequency=CLOCK_SPEED_HZ
