@@ -3,7 +3,8 @@ import os
 
 import math
 import numpy as np
-#import pandas as pd
+import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.fftpack import rfft, rfftfreq
 
@@ -21,14 +22,16 @@ save_path = "/afs/cern.ch/user/m/mman/dune_daq/ssp_testing/test_output/"
 # Process file
 ssp_data = SSPDecoder(filename, num_events)
 
-frag_size = ssp_data.get_frag_size()
-header_size = ssp_data.get_frag_header_size()
-module_channel_id = ssp_data.get_module_channel_id()
-frag_timestamp = ssp_data.get_frag_timestamp()
-nADC = ssp_data.get_nADC()
-ssp_frames = ssp_data.get_ssp_frames()
+ssp_frames = ssp_data.ssp_frames
 
-fragment_count = len(module_channel_id)
+df = pd.DataFrame({"module_id": ssp_data.module_id,
+                   "channel_id": ssp_data.channel_id,
+                   "intsum": ssp_data.intsum})
+
+fragment_count = len(ssp_data.module_id)
+
+##print(len(module_channel_id))
+##print(len(ssp_data.ssp_frames[0]))
 
 ## Generate plots
 
@@ -37,7 +40,7 @@ fig = plt.figure(figsize=(35,15))
 ax = fig.add_subplot()
 
 for i in range(fragment_count):
-    plt.scatter(np.arange(len(ssp_frames[i])), ssp_frames[i], s=40, label="Channel_ID "+str(module_channel_id[i]))
+    plt.scatter(np.arange(len(ssp_frames[i])), ssp_frames[i], s=40, label="Module_Channel_ID "+str(ssp_data.module_id[i])+"_"+str(ssp_data.channel_id[i]))
 
 plt.ylabel("ADC value")
 plt.xlabel('Time ticks')
@@ -55,19 +58,31 @@ ax = fig.add_subplot()
 
 for i in range(fragment_count):
     ## sanity check
-    if len(ssp_frames[i])<2000:
-        print(ssp_frames[i])
-        continue
+    ##if len(ssp_frames[i])<480:
+    ##    print(ssp_frames[i])
+    ##    continue
     fft = np.abs(rfft(ssp_frames[i]))
-    freq = rfftfreq(2000)
-    plt.plot(freq, fft, label="Channel_ID "+str(module_channel_id[i]))
+    freq = rfftfreq(482)
+    plt.plot(freq, fft, label="Module_Channel_ID "+str(ssp_data.module_id[i])+"_"+str(ssp_data.channel_id[i]))
 
 plt.ylabel("FFT")
 plt.xlabel("Frequency")
 plt.legend()
-#plt.legend(loc='upper center', bbox_to_anchor=(0.5, -0.20))
 
 plt.savefig(save_path+"FFT.png")
+
+## Integrated sum ADC values
+fig = plt.figure(figsize=(35,15))
+
+pivot_data = df.pivot(index="module_id", columns="channel_id", values="intsum")
+ax = sns.heatmap(pivot_data)
+
+plt.title("Integrated sum ADC values")
+plt.ylabel("module")
+plt.xlabel("channel")
+##plt.legend()
+
+plt.savefig(save_path+"Intsum.png")
 
 
 
