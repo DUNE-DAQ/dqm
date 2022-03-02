@@ -14,15 +14,16 @@
 
 namespace dunedaq::dqm {
 
-class ChannelMapEmpty : public ChannelMap{
+class ChannelMapEmpty : public ChannelMap
+{
 
 public:
   bool is_filled();
 };
 
-
 bool
-ChannelMapEmpty::is_filled() {
+ChannelMapEmpty::is_filled()
+{
   return m_is_filled;
 }
 

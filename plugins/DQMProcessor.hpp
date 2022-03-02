@@ -20,6 +20,7 @@
 #include "daqdataformats/TriggerRecord.hpp"
 #include "dfmessages/TriggerDecision.hpp"
 #include "timinglibs/TimestampEstimator.hpp"
+#include <ipm/Receiver.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -52,7 +53,7 @@ public:
   void do_stop(const data_t&);
   void do_configure(const data_t&);
 
-  std::atomic<bool> m_run_marker;
+  void dispatch_timesync(ipm::Receiver::Response message);
 
   void RequestMaker();
   dfmessages::TriggerDecision CreateRequest(std::vector<dfmessages::GeoID>& m_links, int number_of_frames);
@@ -60,6 +61,7 @@ public:
   void get_info(opmonlib::InfoCollector& ci, int /*level*/);
 
 private:
+  std::atomic<bool> m_run_marker;
   using trigger_record_source_qt = appfwk::DAQSource<std::unique_ptr<daqdataformats::TriggerRecord>>;
   std::unique_ptr<trigger_record_source_qt> m_source;
   using trigger_decision_sink_qt = appfwk::DAQSink<dfmessages::TriggerDecision>;
@@ -72,9 +74,9 @@ private:
   dqmprocessor::StandardDQM m_standard_dqm_hist;
   dqmprocessor::StandardDQM m_standard_dqm_mean_rms;
   dqmprocessor::StandardDQM m_standard_dqm_fourier;
+  dqmprocessor::StandardDQM m_standard_dqm_fourier_sum;
 
-  using timesync_source_qt = appfwk::DAQSource<dfmessages::TimeSync>;
-  std::unique_ptr<timesync_source_qt> m_timesync_source;
+  std::string m_timesync_connection;
 
   std::unique_ptr<timinglibs::TimestampEstimator> m_time_est;
 
@@ -83,19 +85,19 @@ private:
   std::string m_kafka_address;
   std::vector<int> m_link_idx;
 
-  uint16_t m_region;
+  uint16_t m_region; // NOLINT(build/unsigned)
   int m_clock_frequency;
 
   std::unique_ptr<std::thread> m_running_thread;
 
-  std::atomic<int> m_request_count{0};
-  std::atomic<int> m_total_request_count{0};
-  std::atomic<int> m_data_count{0};
-  std::atomic<int> m_total_data_count{0};
+  std::atomic<int> m_request_count{ 0 };
+  std::atomic<int> m_total_request_count{ 0 };
+  std::atomic<int> m_data_count{ 0 };
+  std::atomic<int> m_total_data_count{ 0 };
+  std::atomic<uint64_t> m_received_timesync_count{ 0 }; // NOLINT(build/unsigned)
 
   std::string m_channel_map;
   std::unique_ptr<ChannelMap> m_map;
-
 };
 
 } // namespace dunedaq::dqm

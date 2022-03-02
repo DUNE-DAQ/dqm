@@ -13,22 +13,28 @@
 #include "daqdataformats/TriggerRecord.hpp"
 
 #include <atomic>
+#include <memory>
+#include <string>
 
 namespace dunedaq::dqm {
 
 class AnalysisModule
 {
 public:
-  std::atomic<bool> m_run_mark = false;
 
-  virtual bool is_running();
-  virtual void run(std::unique_ptr<daqdataformats::TriggerRecord> record, std::unique_ptr<ChannelMap> &map, std::string kafka_address) = 0;
+  bool get_is_running() const { return m_is_running; }
+
+  virtual void run(std::unique_ptr<daqdataformats::TriggerRecord> record,
+                   std::atomic<bool>& run_mark,
+                   std::unique_ptr<ChannelMap>& map,
+                   std::string kafka_address) = 0;
+
+protected:
+  void set_is_running(bool status) { m_is_running = status; }
+
+private:
+  std::atomic<bool> m_is_running = false;
 };
-
-bool
-AnalysisModule::is_running(){
-  return m_run_mark;
-}
 
 } // namespace dunedaq::dqm
 

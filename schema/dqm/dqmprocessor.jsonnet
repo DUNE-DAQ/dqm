@@ -30,12 +30,14 @@ local dqmprocessor = {
     index_list : s.sequence("IndexList", self.index,
                             doc="A list with indexes"),
 
+    netmgr_name : s.string("NetMgrName", doc="Connection or topic name to be used with NetworkManager"),
+
     standard_dqm: s.record("StandardDQM", [
-        s.field("how_often", self.time, 1,
+        s.field("how_often", self.time, 0,
                 doc="Algorithm is run every x seconds"),
-        s.field("unavailable_time", self.time, 1,
+        s.field("unavailable_time", self.time, 0,
                 doc="When it's time to run the algorithm but it's already running wait this time"),
-        s.field("num_frames", self.count, 1,
+        s.field("num_frames", self.count, 0,
                 doc="How many frames do we process in each instance of the algorithm")
     ], doc="Standard DQM analysis"),
 
@@ -49,12 +51,16 @@ local dqmprocessor = {
                 doc="Standard dqm"),
         s.field("sdqm_fourier", self.standard_dqm,   # This one is for fourier transforms
                 doc="Fourier"),
+        s.field("sdqm_fourier_sum", self.standard_dqm, # This one is for summed fourier transforms
+                doc="Fourier sum"),
         s.field("kafka_address", self.string,
                 doc="Address used for sending to the kafka broker"),
         s.field("link_idx", self.index_list,
                 doc="Index of each link that is sending data"),
         s.field("clock_frequency", self.big_count,
-                doc="Clock frequency in Hz")
+                doc="Clock frequency in Hz"),
+        s.field("timesync_connection_name", self.netmgr_name,
+                doc="Connection to use for receiving TimeSync messages")
     ], doc="Generic DQM configuration")
 };
 
