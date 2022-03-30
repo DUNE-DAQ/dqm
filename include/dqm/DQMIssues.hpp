@@ -34,6 +34,8 @@ ERS_DECLARE_ISSUE(dqm, ProcessorError, "Error in DQMProcessor: " << error, ((std
 
 ERS_DECLARE_ISSUE(dqm, InvalidData, "Data was not valid: " << error, ((std::string)error))
 
+ERS_DECLARE_ISSUE(dqm, CouldNotCreateFourierPlan, "Fourier plan was not created ", ((std::string)error))
+
 } // namespace dunedaq
 
 #endif // DQM_INCLUDE_DQM_DQMISSUES_HPP_
