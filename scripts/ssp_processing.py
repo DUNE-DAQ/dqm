@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.fftpack import rfft, rfftfreq
 
-#from kafka import KafkaProducer
+from kafka import KafkaProducer
 
 import sys
 
@@ -15,6 +15,8 @@ import detdataformats.ssp
 from rawdatautils import *
 import h5py
 
+server = ""
+producer = KafkaProducer(bootstrap_servers=server, max_request_size=101626282)
 
 # Parameters
 #filname = "/eos/experiment/neutplatform/protodune/rawdata/np04/vd-protodune-pds/raw/2021/detector/test/None/00/01/21/65/np02_pds_run012165_0000_20211126T181018.hdf5" 
@@ -22,41 +24,49 @@ filename = "/eos/user/m/mman/np02_pds_run012450_0000_20220225T100020.hdf5.copied
 #num_events = 1
 save_path = "/afs/cern.ch/user/m/mman/dunedaq-v2.9.0/ssp_test_out/"
 
-# initialize variable lists
-module_id = []
-channel_id = []
-ext_timestamp = []
-peaksum = []
-peaktime = []
-prerise = []
-intsum = []
-baseline = []
-baseline_sum = []
 
-# Extract event_header info
-ssp_file = HDF5RawDataFile(filename)
+def EventHeaderDecoder(filename):
+    # initialize variable lists
+    module_id = []
+    channel_id = []
+    ext_timestamp = []
+    peaksum = []
+    peaktime = []
+    prerise = []
+    intsum = []
+    baseline = []
+    baseline_sum = []
 
-for dpath in ssp_file.get_all_fragment_dataset_paths():
-    frag = ssp_file.get_frag(dpath)
-    if frag.get_element_id().system_type!=daqdataformats.GeoID.SystemType.kPDS:
-        print("WARNING: fragment is not PDS type")
-        break
+    # Extract event_header info
+    ssp_file = HDF5RawDataFile(filename)
 
-    ## Parse SSP frag
-    event_header = detdataformats.ssp.EventHeader(frag.get_data())
-    ts = (event_header.timestamp[3] << 48) + (event_header.timestamp[2] << 32) + (event_header.timestamp[1] << 16) + (event_header.timestamp[0] << 0)
-    ext_timestamp.append(ts)
-    module_id.append((event_header.group2 & 0xFFF0) >> 4)
-    channel_id.append((event_header.group2 & 0x000F) >> 0)
-    peaktime.append((event_header.group3 & 0xFF00) >> 8)
-    prerise.append(((event_header.group4 & 0x00FF) << 16) + event_header.preriseLow)
-    intsum.append((event_header.intSumHigh << 8) + ((event_header.group4 & 0xFF00) >> 8))
-    baseline.append(event_header.baseline)
-    baseline_sum.append(((event_header.group4 & 0x00FF) << 16) + event_header.preriseLow)
+    for dpath in ssp_file.get_all_fragment_dataset_paths():
+        frag = ssp_file.get_frag(dpath)
+        if frag.get_element_id().system_type!=daqdataformats.GeoID.SystemType.kPDS:
+            print("WARNING: fragment is not PDS type")
+            break
+
+        ## Parse SSP frag
+        event_header = detdataformats.ssp.EventHeader(frag.get_data())
+        ts = (event_header.timestamp[3] << 48) + (event_header.timestamp[2] << 32) + (event_header.timestamp[1] << 16) + (event_header.timestamp[0] << 0)
+        ext_timestamp.append(ts)
+        module_id.append((event_header.group2 & 0xFFF0) >> 4)
+        channel_id.append((event_header.group2 & 0x000F) >> 0)
+        peaktime.append((event_header.group3 & 0xFF00) >> 8)
+        prerise.append(((event_header.group4 & 0x00FF) << 16) + event_header.preriseLow)
+        intsum.append((event_header.intSumHigh << 8) + ((event_header.group4 & 0xFF00) >> 8))
+        baseline.append(event_header.baseline)
+        baseline_sum.append(((event_header.group4 & 0x00FF) << 16) + event_header.preriseLow)
+    
+    return (module_id, channel_id, ext_timestamp, peaksum, peaktime, prerise, intsum, baseline, baseline_sum)
+
+(module_id, channel_id, ext_timestamp, peaksum, peaktime, prerise, intsum, baseline, baseline_sum) = EventHeaderDecoder(filename)
+
 
 # Extract waveforms
 ssp_data = SSPDecoder(filename)
 ssp_frames = ssp_data.ssp_frames
+#print(type(ssp_frames[0]), ssp_frames[0])
 
 if (len(module_id) != len(ssp_frames)):
     print("Fix Me!")
@@ -67,7 +77,7 @@ n_frags_saved = 28
 
 ## Generate plots
 
-## ADC values over time 
+## ADC waveform plot 
 fig = plt.figure(figsize=(35,15))
 ax = fig.add_subplot()
 
@@ -84,7 +94,27 @@ plt.legend()
 plt.savefig(save_path+"ADC_time.png")
 plt.clf()
 
-## FFT ADC values
+## Kafka Broadcasting
+topic = "testdunedqm"
+datasource = 'datatsource;'
+dataname = 'dataname;'
+run_num = "012450;"
+subrun = "0;"
+event = "0;"
+timestamp = str(ext_timestamp[0])+";"
+metadata = 'metadata;'
+partition = ';'
+app_name = ';'
+plane = '0;'
+
+message = datasource+dataname+run_num+subrun+event+timestamp+metadata+partition+app_name+"0;"+plane
+#print(message)
+adcmessage = np.array2string(np.array(ssp_frames[0]), max_line_width=np.inf, precision=2, threshold=np.inf) + " \n"
+content = message + adcmessage # sum over all messages
+print("Sending raw waveform")
+producer.send(topic, bytes(content, 'utf-8'))
+
+## FFT plot
 fig = plt.figure(figsize=(35,15))
 ax = fig.add_subplot()
 
