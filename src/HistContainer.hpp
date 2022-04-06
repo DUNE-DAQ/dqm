@@ -40,22 +40,23 @@ public:
                 double high,
                 bool only_mean);
 
-  void run(std::unique_ptr<daqdataformats::TriggerRecord> record,
-           std::atomic<bool>& run_mark,
-           std::unique_ptr<ChannelMap>& map,
-           std::string kafka_address = "");
+  std::unique_ptr<daqdataformats::TriggerRecord>
+  run(std::unique_ptr<daqdataformats::TriggerRecord> record,
+      std::atomic<bool>& run_mark,
+      std::shared_ptr<ChannelMap>& map,
+      std::string kafka_address = "");
   void transmit(std::string& kafka_address,
-                std::unique_ptr<ChannelMap>& map,
+                std::shared_ptr<ChannelMap>& map,
                 const std::string& topicname,
                 int run_num,
                 time_t timestamp);
   void transmit_mean_and_rms(std::string& kafka_address,
-                             std::unique_ptr<ChannelMap>& map,
+                             std::shared_ptr<ChannelMap>& map,
                              const std::string& topicname,
                              int run_num,
                              time_t timestamp);
   void clean();
-  void append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap>& map); // NOLINT(build/unsigned)
+  void append_to_string(std::uint64_t timestamp, std::shared_ptr<ChannelMap>& map); // NOLINT(build/unsigned)
   void fill(int ch, double value);
   void fill(int ch, int link, double value);
   int get_local_index(int ch, int link);
@@ -99,10 +100,10 @@ HistContainer::HistContainer(std::string name,
   }
 }
 
-void
+std::unique_ptr<daqdataformats::TriggerRecord>
 HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
                    std::atomic<bool>&,
-                   std::unique_ptr<ChannelMap>& map,
+                   std::shared_ptr<ChannelMap>& map,
                    std::string kafka_address)
 {
   set_is_running(true);
@@ -113,7 +114,7 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
     // throw issue
     set_is_running(false);
     TLOG() << "Found no frames";
-    return;
+    return std::move(record);
   }
 
   // Get all the keys
@@ -139,7 +140,7 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
     if (vec.second.size() != size) {
       ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
       set_is_running(false);
-      return;
+      return std::move(record);
     }
   }
 
@@ -186,10 +187,11 @@ HistContainer::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
   clean();
 
   set_is_running(false);
+  return std::move(record);
 }
 
 void
-HistContainer::append_to_string(std::uint64_t timestamp, std::unique_ptr<ChannelMap>& cmap) // NOLINT(build/unsigned)
+HistContainer::append_to_string(std::uint64_t timestamp, std::shared_ptr<ChannelMap>& cmap) // NOLINT(build/unsigned)
 {
   auto channel_order = cmap->get_map();
   for (auto& [plane, map] : channel_order) {
@@ -205,7 +207,7 @@ HistContainer::append_to_string(std::uint64_t timestamp, std::unique_ptr<Channel
 
 void
 HistContainer::transmit(std::string& kafka_address,
-                        std::unique_ptr<ChannelMap>& cmap,
+                        std::shared_ptr<ChannelMap>& cmap,
                         const std::string& topicname,
                         int run_num,
                         time_t timestamp)
@@ -238,7 +240,7 @@ HistContainer::transmit(std::string& kafka_address,
 
 void
 HistContainer::transmit_mean_and_rms(std::string& kafka_address,
-                                     std::unique_ptr<ChannelMap>& cmap,
+                                     std::shared_ptr<ChannelMap>& cmap,
                                      const std::string& topicname,
                                      int run_num,
                                      time_t timestamp)

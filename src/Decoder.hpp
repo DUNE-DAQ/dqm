@@ -40,6 +40,9 @@ decodewib(daqdataformats::TriggerRecord& record)
   std::map<int, std::vector<detdataformats::wib::WIBFrame*>> wibframes;
 
   for (auto& fragment : fragments) {
+    if (fragment->get_fragment_type() == daqdataformats::FragmentType::kTriggerPrimitives) {
+      continue;
+    }
     auto id = fragment->get_element_id();
     auto element_id = id.element_id;
     int num_chunks =

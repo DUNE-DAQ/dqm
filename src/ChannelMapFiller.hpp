@@ -29,23 +29,25 @@ class ChannelMapFiller : public AnalysisModule
 
 public:
   ChannelMapFiller(std::string name, std::string cmap_name);
-  void run(std::unique_ptr<daqdataformats::TriggerRecord> record,
-           std::atomic<bool>& run_mark,
-           std::unique_ptr<ChannelMap>& map,
-           std::string kafka_address);
+
+  std::unique_ptr<daqdataformats::TriggerRecord>
+  run(std::unique_ptr<daqdataformats::TriggerRecord> record,
+      std::atomic<bool>& run_mark,
+      std::shared_ptr<ChannelMap>& map,
+      std::string kafka_address);
 };
 
-void
+std::unique_ptr<daqdataformats::TriggerRecord>
 ChannelMapFiller::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
                       std::atomic<bool>&,
-                      std::unique_ptr<ChannelMap>& map,
+                      std::shared_ptr<ChannelMap>& map,
                       std::string)
 {
   set_is_running(true);
 
   // Prevent running multiple times
   if (map->is_filled()) {
-    return;
+    return std::move(record);
   }
 
   if (m_cmap_name == "HD") {
@@ -56,6 +58,7 @@ ChannelMapFiller::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
 
   map->fill(*record);
   set_is_running(false);
+  return std::move(record);
 }
 
 ChannelMapFiller::ChannelMapFiller(std::string name, std::string cmap_name)

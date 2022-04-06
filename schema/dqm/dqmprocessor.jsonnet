@@ -21,11 +21,11 @@ local dqmprocessor = {
     count : s.number("Count", "i4",
                      doc="A count of not too many things"),
 
-    big_count : s.number("BigCount", "i8",
-                         doc="A count of more things"),
-
     index : s.number("Index", "i4",
                      doc="An integer index"),
+
+    big_count : s.number("BigCount", "i8",
+                         doc="A count of more things"),
 
     index_list : s.sequence("IndexList", self.index,
                             doc="A list with indexes"),
@@ -45,6 +45,7 @@ local dqmprocessor = {
     conf: s.record("Conf", [
         s.field("region", self.index, 0, doc="The region index"),
         s.field("channel_map", self.string, doc='"HD" or "VD"'),
+        s.field("mode", self.string, doc='readout or df',),
         s.field("sdqm_hist", self.standard_dqm,      # This one is for the raw event display
                 doc="Standard dqm"),
         s.field("sdqm_mean_rms", self.standard_dqm,  # This one is for the Mean and RMS
@@ -60,7 +61,24 @@ local dqmprocessor = {
         s.field("clock_frequency", self.big_count,
                 doc="Clock frequency in Hz"),
         s.field("timesync_connection_name", self.netmgr_name,
-                doc="Connection to use for receiving TimeSync messages")
+                doc="Connection to use for receiving TimeSync messages"),
+        s.field("df2dqm_connection_name", self.netmgr_name,
+                doc="Connection to use for receiving TRs from DF"),
+        s.field("dqm2df_connection_name", self.netmgr_name,
+                doc="Connection to use for sending TRMon messages to DF"),
+        s.field("readout_window_offset", self.big_count,
+                doc="Offset to use for the windows requested to readout"),
+
+        s.field("df_seconds", self.time,
+                doc="Number of seconds between requests to DF for TRs"),
+        s.field("df_offset", self.time,
+                doc="Number of seconds to offset so that when there are multiple DF apps the rate is maintained"),
+        s.field("df_algs", self.big_count,
+                doc="Bitfield where the bits are whether an algorith is turned on or off for TRs coming from DF"),
+        s.field("df_num_frames", self.count,
+                doc="Bitfield where the bits are whether an algorith is turned on or off for TRs coming from DF")
+
+
     ], doc="Generic DQM configuration")
 };
 
