@@ -15,7 +15,7 @@ import detdataformats.ssp
 from rawdatautils import *
 import h5py
 
-server = ""
+server = "monkafka.cern.ch:30092"
 producer = KafkaProducer(bootstrap_servers=server, max_request_size=101626282)
 
 # Parameters
@@ -96,23 +96,33 @@ plt.clf()
 
 ## Kafka Broadcasting
 topic = "testdunedqm"
-datasource = 'datatsource;'
-dataname = 'dataname;'
-run_num = "012450;"
-subrun = "0;"
-event = "0;"
-timestamp = str(ext_timestamp[0])+";"
-metadata = 'metadata;'
-partition = ';'
-app_name = ';'
-plane = '0;'
+datasource = 'mman_ssp_test'
+dataname = 'ssp_display'
+run_num = "012450"
+subrun = "0"
+event = "0"
+timestamp = str(ext_timestamp[0])
+metadata = 'metadata'
+partition = ''
+app_name = ''
+plane = '0'
 
-message = datasource+dataname+run_num+subrun+event+timestamp+metadata+partition+app_name+"0;"+plane
+times = np.arange(len(ssp_frames[0]))*6.66 # nanoseconds
+#message = datasource+dataname+run_num+subrun+event+timestamp+metadata+partition+app_name+"0;"+plane
+message = f'{datasource};{dataname};{run_num};{subrun};{event};{timestamp};{metadata};{partition};{app_name};0;{plane};'
 #print(message)
-adcmessage = np.array2string(np.array(ssp_frames[0]), max_line_width=np.inf, precision=2, threshold=np.inf) + " \n"
-content = message + adcmessage # sum over all messages
+adcmessage = np.array2string(np.array(ssp_frames[0]), max_line_width=np.inf, precision=2, threshold=np.inf, formatter={'float_kind':lambda x: "%.2f" % x}) + ' \n'
+timemessage = np.array2string(times, max_line_width=np.inf, precision=2, threshold=np.inf, formatter={'float_kind':lambda x: "%.2f" % x}) + ' \n'
+
+#for i in range(len(times)):
+    #val = np.array2string(np.array(ssp_frames[0]), max_line_width=np.inf, precision=2, threshold=np.inf) 
+    #message += f'{times[i]}\n{val} \n'
+
+#test message
+test_message = message + adcmessage + timemessage
+
 print("Sending raw waveform")
-producer.send(topic, bytes(content, 'utf-8'))
+producer.send(topic, bytes(test_message, 'utf-8'))
 
 ## FFT plot
 fig = plt.figure(figsize=(35,15))
