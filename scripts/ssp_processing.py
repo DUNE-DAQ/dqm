@@ -20,9 +20,13 @@ producer = KafkaProducer(bootstrap_servers=server, max_request_size=101626282)
 
 # Parameters
 #filname = "/eos/experiment/neutplatform/protodune/rawdata/np04/vd-protodune-pds/raw/2021/detector/test/None/00/01/21/65/np02_pds_run012165_0000_20211126T181018.hdf5" 
-filename = "/eos/user/m/mman/np02_pds_run012450_0000_20220225T100020.hdf5.copied" #np02_arapucas_run011966_0000_20211102T141910.hdf5"
+#filename = "/eos/user/m/mman/np02_pds_run012450_0000_20220225T100020.hdf5.copied" #np02_arapucas_run011966_0000_20211102T141910.hdf5"
 #num_events = 1
-save_path = "/afs/cern.ch/user/m/mman/dunedaq-v2.9.0/ssp_test_out/"
+#save_path = "/afs/cern.ch/user/m/mman/dunedaq-v2.9.0/ssp_test_out/"
+filename = "/scratch/pahamilt/data/np02_pds_run012450_0000_20220225T100020.hdf5.copied"
+save_path = "/scratch/pahamilt/ssp_script_output/"
+
+
 
 
 def EventHeaderDecoder(filename):
@@ -96,14 +100,14 @@ plt.clf()
 
 ## Kafka Broadcasting
 topic = "testdunedqm"
-datasource = 'mman_ssp_test'
+datasource = 'pip_ssp_test'
 dataname = 'ssp_display'
 run_num = "012450"
 subrun = "0"
 event = "0"
 timestamp = str(ext_timestamp[0])
 metadata = 'metadata'
-partition = ''
+partition = 'nopartition'
 app_name = ''
 plane = '0'
 
