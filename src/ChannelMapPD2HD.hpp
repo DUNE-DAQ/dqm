@@ -16,6 +16,7 @@
 
 #include "daqdataformats/TriggerRecord.hpp"
 #include "detchannelmaps/TPCChannelMap.hpp"
+#include "detdataformats/wib2/WIB2Frame.hpp"
 #include "logging/Logging.hpp"
 
 #include <cstdlib>
@@ -58,7 +59,7 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
     return;
   }
 
-  auto wibframes = decode<detdataformats::wib::WIBFrame>(record);
+  auto wibframes = decode<detdataformats::wib2::WIB2Frame>(record);
 
   // If we get no frames then return and since
   // the map is not filled it will run again soon
@@ -69,9 +70,9 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
   for (auto& [key, value] : wibframes) {
     // This is one link so we push back one element to m_map
     for (auto& fr : value) {
-      int crate = fr->get_wib_header()->crate_no;
-      int slot = fr->get_wib_header()->slot_no;
-      int fiber = fr->get_wib_header()->fiber_no;
+      int crate = fr->header.crate;
+      int slot = fr->header.slot;
+      int fiber = fr->header.link;
       TLOG() << crate << " " << slot << " " << fiber;
       crate = 1;
       auto tmp = std::make_tuple(crate, slot, fiber);
