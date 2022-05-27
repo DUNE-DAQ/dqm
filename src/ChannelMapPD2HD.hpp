@@ -59,7 +59,7 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
     return;
   }
 
-  auto wibframes = decode<detdataformats::wib::WIB2Frame>(record);
+  auto wibframes = decode<detdataformats::wib2::WIB2Frame>(record);
 
   // If we get no frames then return and since
   // the map is not filled it will run again soon
