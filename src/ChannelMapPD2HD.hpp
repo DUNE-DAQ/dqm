@@ -15,6 +15,7 @@
 #include "dqm/DQMIssues.hpp"
 
 #include "daqdataformats/TriggerRecord.hpp"
+#include "detdataformats/wib2/WIB2Frame.hpp"
 #include "detchannelmaps/TPCChannelMap.hpp"
 #include "detdataformats/wib2/WIB2Frame.hpp"
 #include "logging/Logging.hpp"
