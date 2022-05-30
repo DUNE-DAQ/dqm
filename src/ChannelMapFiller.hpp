@@ -43,7 +43,7 @@ std::unique_ptr<daqdataformats::TriggerRecord>
 ChannelMapFiller::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
                       std::atomic<bool>&,
                       std::shared_ptr<ChannelMap>& map,
-                      std::string& frontend_type,
+                      std::string&,
                       const std::string&)
 {
   set_is_running(true);
