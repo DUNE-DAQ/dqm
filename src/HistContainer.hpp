@@ -274,7 +274,6 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
       timestamp = fr->get_timestamp() - min_timestamp;
 
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
-        TLOG() << "Filling " << ich << " " << keys[ikey] << " " << fr->get_adc(ich);
         fill(ich, keys[ikey], fr->get_adc(ich));
       }
     }
@@ -285,7 +284,6 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
     }
   }
   if (m_only_mean_rms) {
-    TLOG() << "Going to transmit";
     transmit_mean_and_rms(kafka_address,
                           map,
                           "testdunedqm",
@@ -384,11 +382,8 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
   std::string metadata = "";
   int subrun = 0;
   int event = 0;
-  TLOG() << "Getting partition";
   std::string partition = getenv("DUNEDAQ_PARTITION");
-  TLOG() << "partition is " << partition;
   std::string app_name = getenv("DUNEDAQ_APPLICATION_NAME");
-  TLOG() << "app_name is " << app_name;
   std::string datasource = partition + "_" + app_name;
 
   // TLOG() << "DATASOURCE " << datasource;
@@ -396,7 +391,6 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
   // One message is sent for every plane
   auto channel_order = cmap->get_map();
   for (auto& [plane, map] : channel_order) {
-    TLOG() << "Plane " << plane;
     std::stringstream output;
     output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp
            << ";" << metadata << ";" << partition << ";" << app_name << ";" << 0 << ";" << plane << ";";
@@ -408,8 +402,6 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
     for (auto& [offch, pair] : map) {
       int link = pair.first;
       int ch = pair.second;
-      TLOG() << "Getting mean for ch = " << ch << " and link = " << link << ", and local index " << get_local_index(ch, link);
-      TLOG() << "Result " << histvec[get_local_index(ch, link)].mean();
       output << histvec[get_local_index(ch, link)].mean() << " ";
     }
     output << "\n";
