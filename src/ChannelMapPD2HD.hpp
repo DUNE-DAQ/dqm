@@ -68,6 +68,8 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
 
   std::set<std::tuple<int, int, int>> frame_numbers;
   for (auto& [key, value] : wibframes) {
+    TLOG() << "CMAP: key = " << key;
+
     // This is one link so we push back one element to m_map
     for (auto& fr : value) {
       int crate = fr->header.crate;
@@ -84,7 +86,7 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
         auto channel = m_chmap_service->get_offline_channel_from_crate_slot_fiber_chan(crate, slot, fiber, ich);
         auto plane = m_chmap_service->get_plane_from_offline_channel(channel);
-        TLOG() << plane << " " << channel << " " << key << " " << ich;
+        // TLOG() << plane << " " << channel << " " << key << " " << ich;
         m_map[plane][channel] = { key, ich };
       }
     }
