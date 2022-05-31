@@ -246,14 +246,14 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
 
   // Check that all the wibframes vectors have the same size, if not, something
   // bad has happened, for now don't do anything
-  // auto size = wibframes.begin()->second.size();
-  // for (auto& vec : wibframes) {
-  //   if (vec.second.size() != size) {
-  //     ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
-  //     set_is_running(false);
-  //     return std::move(record);
-  //   }
-  // }
+  auto size = wibframes.begin()->second.size();
+  for (auto& vec : wibframes) {
+    if (vec.second.size() != size) {
+      ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
+      set_is_running(false);
+      return std::move(record);
+    }
+  }
 
 
   // Main loop
