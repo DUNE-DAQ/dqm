@@ -144,9 +144,8 @@ HistContainer::run_wibframe(std::unique_ptr<daqdataformats::TriggerRecord> recor
   }
   uint64_t timestamp = 0; // NOLINT(build/unsigned)
 
-  for (auto& vec : wibframes) {
-    TLOG() << "Size is " << vec.second.size();
-  }
+
+
   // Check that all the wibframes vectors have the same size, if not, something
   // bad has happened, for now don't do anything
   // auto size = wibframes.begin()->second.size();
@@ -230,6 +229,10 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
 
   for (auto& key : keys) {
     TLOG() << "HistContainer: key = " << key;
+  }
+
+  for (auto& vec : wibframes) {
+    TLOG() << "Size is " << vec.second.size();
   }
 
   uint64_t min_timestamp = 0; // NOLINT(build/unsigned)
