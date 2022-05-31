@@ -268,6 +268,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
       timestamp = fr->get_timestamp() - min_timestamp;
 
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
+        TLOG() << "Filling " << ich << " " << keys[ikey] << " " << fr->get_adc(ich);
         fill(ich, keys[ikey], fr->get_adc(ich));
       }
     }
@@ -396,6 +397,8 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
     for (auto& [offch, pair] : map) {
       int link = pair.first;
       int ch = pair.second;
+      TLOG() << "Getting mean for ch = " << ch << " and link = " << link << ", and local index " << get_local_index(ch, link);
+      TLOG() << "Result " << histvec[get_local_index(ch, link)].mean();
       output << histvec[get_local_index(ch, link)].mean() << " ";
     }
     output << "\n";
