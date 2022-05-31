@@ -377,8 +377,11 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
   std::string metadata = "";
   int subrun = 0;
   int event = 0;
+  TLOG() << "Getting partition";
   std::string partition = getenv("DUNEDAQ_PARTITION");
+  TLOG() << "partition is " << partition;
   std::string app_name = getenv("DUNEDAQ_APPLICATION_NAME");
+  TLOG() << "app_name is " << app_name;
   std::string datasource = partition + "_" + app_name;
 
   // TLOG() << "DATASOURCE " << datasource;
@@ -386,6 +389,7 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
   // One message is sent for every plane
   auto channel_order = cmap->get_map();
   for (auto& [plane, map] : channel_order) {
+    TLOG() << "Plane " << plane;
     std::stringstream output;
     output << datasource << ";" << dataname << ";" << run_num << ";" << subrun << ";" << event << ";" << timestamp
            << ";" << metadata << ";" << partition << ";" << app_name << ";" << 0 << ";" << plane << ";";
