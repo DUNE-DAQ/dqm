@@ -279,6 +279,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
     }
   }
   if (m_only_mean_rms) {
+    TLOG() << "Going to transmit";
     transmit_mean_and_rms(kafka_address,
                           map,
                           "testdunedqm",
