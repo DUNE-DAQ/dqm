@@ -75,7 +75,7 @@ ChannelMapPD2HD::fill(daqdataformats::TriggerRecord& record)
       int slot = fr->header.slot;
       int fiber = fr->header.link;
       TLOG() << crate << " " << slot << " " << fiber;
-      crate = 1;
+      //crate = 1;
       auto tmp = std::make_tuple(crate, slot, fiber);
       if (frame_numbers.find(tmp) == frame_numbers.end()) {
         frame_numbers.insert(tmp);
