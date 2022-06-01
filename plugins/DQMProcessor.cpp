@@ -194,12 +194,12 @@ DQMProcessor::RequestMaker()
   auto fourier = std::make_shared<FourierContainer>("fft_display",
                                                       CHANNELS_PER_LINK * m_link_idx.size(),
                                                       m_link_idx,
-                                                      1. / m_clock_frequency * TICKS_BETWEEN_TIMESTAMP,
+                                                    1. / m_clock_frequency * (m_frontend_type == "wib" ? 25 : 32),
                                                       m_standard_dqm_fourier.num_frames);
   auto fouriersum = std::make_shared<FourierContainer>("fft_sums_display",
                                                       4,
                                                       m_link_idx,
-                                                      1. / m_clock_frequency * TICKS_BETWEEN_TIMESTAMP,
+                                                      1. / m_clock_frequency * (m_frontend_type == "wib" ? 25 : 32),
                                                       m_standard_dqm_fourier_sum.num_frames,
                                                       true);
   auto channel_mask = std::make_shared<ChannelMask>("channel_mask_display",
@@ -447,7 +447,7 @@ DQMProcessor::CreateRequest(std::vector<dfmessages::GeoID>& m_links, int number_
   decision.trigger_timestamp = timestamp;
   decision.readout_type = dfmessages::ReadoutType::kMonitoring;
 
-  int window_size = number_of_frames * TICKS_BETWEEN_TIMESTAMP;
+  int window_size = number_of_frames * (m_frontend_type == "wib" ? 25 : 32);
 
   for (auto& link : m_links) {
     // TLOG() << "ONE LINK";

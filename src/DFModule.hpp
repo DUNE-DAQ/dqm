@@ -50,7 +50,7 @@ private:
 };
 
 DFModule::DFModule(bool enable_hist, bool enable_mean_rms, bool enable_fourier, bool enable_fourier_sum,
-                   int clock_frequency, std::vector<int>& ids, int num_frames) :
+                   int clock_frequency, std::vector<int>& ids, int num_frames, std::string& frontend_type) :
     m_enable_hist(enable_hist),
     m_enable_mean_rms(enable_mean_rms),
     m_enable_fourier(enable_fourier),
@@ -72,14 +72,14 @@ DFModule::DFModule(bool enable_hist, bool enable_mean_rms, bool enable_fourier, 
     m_fourier = std::make_shared<FourierContainer>("fft_display",
                                                     CHANNELS_PER_LINK * m_ids.size(),
                                                     m_ids,
-                                                    1. / m_clock_frequency * TICKS_BETWEEN_TIMESTAMP,
+                                                   1. / m_clock_frequency * (frontend_type == "wib" ? 25 : 32),
                                                     m_num_frames);
   }
   if (m_enable_fourier_sum) {
     m_fourier_sum = std::make_shared<FourierContainer>("fft_sums_display",
                                                        4,
                                                        m_ids,
-                                                       1. / m_clock_frequency * TICKS_BETWEEN_TIMESTAMP,
+                                                       1. / m_clock_frequency * (frontend_type == "wib" ? 25 : 32),
                                                        m_num_frames,
                                                        true);
   }
