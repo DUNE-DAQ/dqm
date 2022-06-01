@@ -27,7 +27,7 @@ class DFModule : public AnalysisModule
 
 public:
   DFModule(bool enable_hist, bool enable_mean_rms, bool enable_fourier, bool enable_fourier_sum,
-           int clock_frequency, std::vector<int>& ids, int num_frames);
+           int clock_frequency, std::vector<int>& ids, int num_frames, std::string& frontend_type);
 
   bool m_enable_hist, m_enable_mean_rms, m_enable_fourier, m_enable_fourier_sum;
   int m_clock_frequency;

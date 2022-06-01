@@ -210,7 +210,7 @@ DQMProcessor::RequestMaker()
   auto dfmodule = std::make_shared<DFModule>(m_df_algs & 1, m_df_algs & 2,
                                              m_df_algs & 4, m_df_algs & 8,
                                              m_clock_frequency, m_link_idx,
-                                             m_df_num_frames);
+                                             m_df_num_frames, m_frontend_type);
 
   // Fills the channel map at the beggining of a run
   auto chfiller = std::make_shared<ChannelMapFiller>("channelmapfiller", m_channel_map);
