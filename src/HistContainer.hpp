@@ -148,14 +148,21 @@ HistContainer::run_wibframe(std::unique_ptr<daqdataformats::TriggerRecord> recor
 
   // Check that all the wibframes vectors have the same size, if not, something
   // bad has happened, for now don't do anything
-  // auto size = wibframes.begin()->second.size();
-  // for (auto& vec : wibframes) {
-  //   if (vec.second.size() != size) {
-  //     ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
-  //     set_is_running(false);
-  //     return std::move(record);
-  //   }
-  // }
+  auto size = wibframes.begin()->second.size();
+  for (auto& vec : wibframes) {
+    if (vec.second.size() != size) {
+      // ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
+      TLOG() << "the size of the vector of frames is different for each link, got " << size << " frames for the first link and " << vec.second.size() << " frames for another link";
+      if (!m_only_mean_rms) {
+        set_is_running(false);
+        return std::move(record);
+      }
+      break;
+
+      // set_is_running(false);
+      // return std::move(record);
+    }
+  }
 
 
   // Main loop
@@ -170,6 +177,7 @@ HistContainer::run_wibframe(std::unique_ptr<daqdataformats::TriggerRecord> recor
   for (size_t ifr = 0; ifr < wibframes[keys[0]].size(); ++ifr) {
     // Fill for every link
     for (size_t ikey = 0; ikey < keys.size(); ++ikey) {
+      if (ifr >= wibframes[keys[ikey]].size()) continue;
       auto fr = wibframes[keys[ikey]][ifr];
 
       // Timestamps are too big for them to be displayed nicely, subtract the minimum timestamp
