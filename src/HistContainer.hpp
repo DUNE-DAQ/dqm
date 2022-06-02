@@ -168,6 +168,7 @@ HistContainer::run_wibframe(std::unique_ptr<daqdataformats::TriggerRecord> recor
   for (size_t ifr = 0; ifr < wibframes[keys[0]].size(); ++ifr) {
     // Fill for every link
     for (size_t ikey = 0; ikey < keys.size(); ++ikey) {
+      if (ifr >= wibframes[keys[ikey]].size()) continue;
       auto fr = wibframes[keys[ikey]][ifr];
 
       // Timestamps are too big for them to be displayed nicely, subtract the minimum timestamp
@@ -259,6 +260,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   for (size_t ifr = 0; ifr < wibframes[keys[0]].size(); ++ifr) {
     // Fill for every link
     for (size_t ikey = 0; ikey < keys.size(); ++ikey) {
+      if (ifr >= wibframes[keys[ikey]].size()) continue;
       auto fr = wibframes[keys[ikey]][ifr];
 
       // Timestamps are too big for them to be displayed nicely, subtract the minimum timestamp
