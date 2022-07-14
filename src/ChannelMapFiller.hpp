@@ -15,6 +15,7 @@
 #include "ChannelMapHD.hpp"
 #include "ChannelMapPD2HD.hpp"
 #include "ChannelMapVD.hpp"
+#include "ChannelMapHDCB.hpp"
 
 #include "daqdataformats/TriggerRecord.hpp"
 
@@ -62,6 +63,9 @@ ChannelMapFiller::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
   else if (m_cmap_name == "PD2HD") {
     map.reset(new ChannelMapPD2HD);
   }
+  else if (m_cmap_name == "HDCB") {
+    map.reset(new ChannelMapHDCB);
+  }
 
   map->fill(*record);
   set_is_running(false);
@@ -71,7 +75,7 @@ ChannelMapFiller::run(std::unique_ptr<daqdataformats::TriggerRecord> record,
 ChannelMapFiller::ChannelMapFiller(std::string name, std::string cmap_name)
   : m_name(name)
 {
-  if (cmap_name != "HD" && cmap_name != "VD" && cmap_name != "PD2HD") {
+  if (cmap_name != "HD" && cmap_name != "VD" && cmap_name != "PD2HD" && cmap_name != "HDCB") {
     TLOG() << "Wrong channel map name";
   } else {
     m_cmap_name = cmap_name;
