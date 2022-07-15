@@ -230,7 +230,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   for (auto& key : keys) {
     if (!wibframes[key].empty()) {
       min_timestamp = wibframes[key].front()->get_timestamp();
-      break;
+      TLOG() << "min_timestamp = " << min_timestamp;
     }
   }
   uint64_t timestamp = 0; // NOLINT(build/unsigned)
