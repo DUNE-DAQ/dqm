@@ -33,7 +33,7 @@ decode_frame(daqdataformats::TriggerRecord& record)
   std::map<int, std::vector<T*>> frames;
 
   for (auto& fragment : fragments) {
-    if (fragment->get_fragment_type() == daqdataformats::FragmentType::kTriggerPrimitives) {
+    if (fragment->get_fragment_type() != daqdataformats::FragmentType::kTPCData) {
       continue;
     }
     auto id = fragment->get_element_id();
