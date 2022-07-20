@@ -229,7 +229,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   // We run over all links until we find one that has a non-empty vector of frames
   for (auto& key : keys) {
     if (!wibframes[key].empty()) {
-      min_timestamp = min(wibframes[key].front()->get_timestamp(), min_timestamp);
+      min_timestamp = std::min(wibframes[key].front()->get_timestamp(), min_timestamp);
     }
   }
   uint64_t timestamp = 0; // NOLINT(build/unsigned)
