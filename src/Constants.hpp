@@ -11,7 +11,7 @@
 namespace dunedaq::dqm {
 
 constexpr int CHANNELS_PER_LINK = 256;
-constexpr int TICKS_BETWEEN_TIMESTAMP = 25;
+constexpr int TICKS_BETWEEN_TIMESTAMP = 32;
 
 } // namespace dunedaq::dqm
 
