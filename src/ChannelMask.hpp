@@ -78,6 +78,7 @@ ChannelMask::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> record
                              std::shared_ptr<ChannelMap>& map,
                              const std::string& kafka_address)
 {
+  return std::move(record);
   auto wibframes = decode<detdataformats::wib2::WIB2Frame>(*record);
 
   if (wibframes.size() == 0) {
