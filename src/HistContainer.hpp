@@ -403,6 +403,7 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
     }
     output << "\n";
     TLOG() << "Size of the message in bytes: " << output.str().size();
+    TLOG() << "Message " << output.str();
     KafkaExport(kafka_address, output.str(), topicname);
   }
 }
