@@ -239,14 +239,13 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   // Check that all the wibframes vectors have the same size, if not, something
   // bad has happened, for now don't do anything
   // auto size = wibframes.begin()->second.size();
-  for (auto& vec : wibframes) {
-    TLOG() << "Fragment with size " << vec.second.size();
-    // if (vec.second.size() != size) {
-    //   ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
-    //   set_is_running(false);
-    //   return std::move(record);
-    // }
-  }
+  // for (auto& vec : wibframes) {
+  //   // if (vec.second.size() != size) {
+  //   //   ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
+  //   //   set_is_running(false);
+  //   //   return std::move(record);
+  //   // }
+  // }
 
 
   // Main loop
@@ -267,7 +266,6 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
       timestamp = fr->get_timestamp() - min_timestamp;
 
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
-        TLOG() << "Calling fill with args " << ich << " " << keys[ikey] << " " << fr->get_adc(ich);
         fill(ich, keys[ikey], fr->get_adc(ich));
       }
     }
@@ -397,7 +395,7 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
       int link = pair.first;
       int ch = pair.second;
       output << histvec[get_local_index(ch, link)].mean() << " ";
-      TLOG() << "Mean for plane " << plane << ", " << link << ", " << ch << ", " << get_local_index(ch, link) << ", " << histvec[get_local_index(ch, link)].m_nentries;
+      // TLOG() << "Mean for plane " << plane << ", " << link << ", " << ch << ", " << get_local_index(ch, link) << ", " << histvec[get_local_index(ch, link)].m_nentries;
     }
     output << "\n";
     output << "RMS\n";
@@ -407,8 +405,8 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
       output << histvec[get_local_index(ch, link)].std() << " ";
     }
     output << "\n";
-    TLOG() << "Size of the message in bytes: " << output.str().size();
-    TLOG() << "Message " << output.str();
+    // TLOG() << "Size of the message in bytes: " << output.str().size();
+    // TLOG() << "Message " << output.str();
     KafkaExport(kafka_address, output.str(), topicname);
   }
 }
