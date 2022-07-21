@@ -216,8 +216,10 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
 
   // Remove empty fragments
   for (auto& vec : wibframes)
-    if (!vec.second.size())
+    if (!vec.second.size()) {
+      TLOG() << "Removing empty fragment";
       wibframes.erase(vec.first);
+    }
 
   // Get all the keys
   std::vector<int> keys;
@@ -237,13 +239,14 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   // Check that all the wibframes vectors have the same size, if not, something
   // bad has happened, for now don't do anything
   // auto size = wibframes.begin()->second.size();
-  // for (auto& vec : wibframes) {
-  //   if (vec.second.size() != size) {
-  //     ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
-  //     set_is_running(false);
-  //     return std::move(record);
-  //   }
-  // }
+  for (auto& vec : wibframes) {
+    TLOG() << "Fragment with size " << vec.second.size();
+    // if (vec.second.size() != size) {
+    //   ers::error(InvalidData(ERS_HERE, "the size of the vector of frames is different for each link"));
+    //   set_is_running(false);
+    //   return std::move(record);
+    // }
+  }
 
 
   // Main loop
@@ -264,6 +267,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
       timestamp = fr->get_timestamp() - min_timestamp;
 
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
+        TLOG() << "Calling fill with args " << ich << " " << keys[ikey] << " " << fr->get_adc(ich);
         fill(ich, keys[ikey], fr->get_adc(ich));
       }
     }
