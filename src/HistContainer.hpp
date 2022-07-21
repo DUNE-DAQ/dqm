@@ -393,6 +393,7 @@ HistContainer::transmit_mean_and_rms(const std::string& kafka_address,
       int link = pair.first;
       int ch = pair.second;
       output << histvec[get_local_index(ch, link)].mean() << " ";
+      TLOG() << "Mean for plane " << plane << ", " << link << ", " << ch << ", " << get_local_index(ch, link) << ", " << histvec[get_local_index(ch, link)].nentries;
     }
     output << "\n";
     output << "RMS\n";
