@@ -82,7 +82,10 @@ ChannelMapHDCB::fill(daqdataformats::TriggerRecord& record)
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
         auto channel = m_chmap_service->get_offline_channel_from_crate_slot_fiber_chan(crate, slot, fiber, ich);
         auto plane = m_chmap_service->get_plane_from_offline_channel(channel);
-        if (plane == 9999) continue;
+        if (plane == 9999) {
+          TLOG() << "Skipping plane 9999...";
+          continue;
+        }
         m_map[plane][channel] = { key, ich };
       }
     }
