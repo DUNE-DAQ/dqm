@@ -215,6 +215,7 @@ FourierContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> r
 
   // Normal mode, fourier transform for every channel
   if (!m_global_mode) {
+    TLOG() << "LOOP 1" << std::endl;
     for (auto& [key, value] : wibframes) {
       for (auto& fr : value) {
         for (size_t ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
@@ -222,9 +223,11 @@ FourierContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> r
         }
       }
     }
+    TLOG() << "LOOP 2" << std::endl;
     for (size_t ich = 0; ich < m_size; ++ich) {
       fouriervec[ich].compute_fourier_transform();
     }
+    TLOG() << "TRANSMITTING" << std::endl;
     transmit(kafka_address,
              map,
              "testdunedqm",
@@ -236,11 +239,13 @@ FourierContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> r
   else {
     // Initialize the vectors with zeroes, the last one can be done by summing
     // the resulting transform
+    TLOG() << "LOOP 3" << std::endl;
     for (size_t i = 0; i < m_size - 1; ++i) {
       fouriervec[i].m_data = std::vector<double> (m_npoints, 0);
     }
 
     auto channel_order = map->get_map();
+    TLOG() << "LOOP 4" << std::endl;
     for (auto& [plane, map] : channel_order) {
       for (auto& [offch, pair] : map) {
         int link = pair.first;
@@ -251,6 +256,7 @@ FourierContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> r
         }
       }
 
+    TLOG() << "LOOP 5" << std::endl;
     for (size_t ich = 0; ich < m_size - 1; ++ich) {
       if (!run_mark) {
         return std::move(record);
@@ -260,10 +266,13 @@ FourierContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> r
     // The last one corresponds can be obtained as the sum of the ones for the planes
     // since the fourier transform is linear
     std::vector<double> transform(fouriervec[0].m_transform);
+    TLOG() << "LOOP 6" << std::endl;
     for (size_t i = 0; i < fouriervec[0].m_transform.size(); ++i) {
       transform[i] += fouriervec[1].m_transform[i] + fouriervec[2].m_transform[i];
     }
+    TLOG() << "OBTAINING TRANSFORM" << std::endl;
     fouriervec[m_size-1].m_transform = transform;
+    TLOG() << "TRANSMITTING" << std::endl;
     transmit_global(kafka_address, map, "testdunedqm", record->get_header_ref().get_run_number(), record->get_header_ref().get_trigger_timestamp());
   }
 
