@@ -256,17 +256,23 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
   // Fill for every frame, outer loop so it is done frame by frame
   // This is needed for sending frame by frame
   // The order does not matter for the mean and RMS
+  TLOG() << "LOOP BEGINS, ifr MAX = " << wibframes[keys[0]].size() << std::endl;
   for (size_t ifr = 0; ifr < wibframes[keys[0]].size(); ++ifr) {
+    TLOG() << "ikey MAX = " << keys.size() << std::endl;
     // Fill for every link
     for (size_t ikey = 0; ikey < keys.size(); ++ikey) {
+      TLOG() << "INDICES: ikey = " << ikey << ", ifr = " << ifr << std::endl;
       auto fr = wibframes[keys[ikey]][ifr];
+      TLOG() << "CLEARED" << std::endl;
 
       // Timestamps are too big for them to be displayed nicely, subtract the minimum timestamp
       timestamp = fr->get_timestamp() - min_timestamp;
 
+      TLOG() << "FILLING ICH, CHANNELS_PER_LINK = " << CHANNELS_PER_LINK << std::endl;
       for (int ich = 0; ich < CHANNELS_PER_LINK; ++ich) {
         fill(ich, keys[ikey], fr->get_adc(ich));
       }
+      TLOG() << "CLEARED" << std::endl;
     }
     // After we are done with all the links, if needed save the info for later
     if (!m_only_mean_rms) {
@@ -274,6 +280,7 @@ HistContainer::run_wib2frame(std::unique_ptr<daqdataformats::TriggerRecord> reco
       clean();
     }
   }
+  TLOG() << "TRANSMITTING" << std::endl;
   if (m_only_mean_rms) {
     transmit_mean_and_rms(kafka_address,
                           map,
