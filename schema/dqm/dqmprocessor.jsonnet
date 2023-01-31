@@ -32,6 +32,9 @@ local dqmprocessor = {
 
     netmgr_name : s.string("NetMgrName", doc="Connection or topic name to be used with NetworkManager"),
 
+    sourceid_number : s.number("sourceid_number", "u4",
+                     doc="Source identifier"),
+
     standard_dqm: s.record("StandardDQM", [
         s.field("how_often", self.time, 0,
                 doc="Algorithm is run every x seconds"),
@@ -60,7 +63,8 @@ local dqmprocessor = {
         s.field("df_algs", self.string, doc="Bitfield where the bits are whether an algorith is turned on or off for TRs coming from DF"),
         s.field("df_num_frames", self.count, doc="Number of frames for the fragments coming from DF"),
         s.field("max_num_frames", self.count, 0, doc="Maximum number of frames used in the algorithms for the fragments"),
-        s.field("frontend_type", self.string, doc="Frontend to be used for DQM, takes the same values as in readout")
+        s.field("frontend_type", self.string, doc="Frontend to be used for DQM, takes the same values as in readout"),
+        s.field("trb_sourceid", self.sourceid_number, 0, doc="The SourceID of the TRB associated with an instance of the DQMProcessor")
     ], doc="Generic DQM configuration")
 };
 

@@ -131,7 +131,10 @@ DQMProcessor::do_configure(const nlohmann::json& args)
 
   if (m_mode == "readout") {
     m_receiver = get_iom_receiver<std::unique_ptr<daqdataformats::TriggerRecord>>("trigger_record_q_dqm");
-    m_sender = get_iom_sender<dfmessages::TriggerDecision>("trigger_decision_q_dqm");
+
+    std::ostringstream conn_uid_oss;
+    conn_uid_oss << "trigger_decision_" << conf.trb_sourceid;
+    m_sender = get_iom_sender<dfmessages::TriggerDecision>(conn_uid_oss.str());
   }
 }
 
