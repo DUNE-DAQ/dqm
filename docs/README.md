@@ -14,7 +14,7 @@ instructions](https://dune-daq-sw.readthedocs.io/en/latest/packages/daq-buildtoo
 
     For enabling the generation of dqm apps, one has to add `--enable-dqm` to the configuration generation, for example:
 
-        daqconf_multiru_gen -c config.json --hardware-map-file HardwareMap.txt --enable-dqm conf_with_dqm
+        fddaqconf_gen -c config.json --hardware-map-file HardwareMap.txt --enable-dqm conf_with_dqm
 
 <!-- * Standalone configuration -->
 
